@@ -36,7 +36,8 @@ def add_csp(response):
     return response
 
 # ── TomTom API (free, no credit card) – https://developer.tomtom.com ────────
-TOMTOM_API_KEY = "gxB9bdSirhbwNexQAyo7CqOplqTxUPeB"   # ← paste your key here
+import os
+TOMTOM_API_KEY = os.environ.get("TOMTOM_API_KEY", "YOUR_TOMTOM_API_KEY")
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg'}
@@ -159,7 +160,7 @@ def get_nearby_places(city, user_lat, user_lon, device_name, repairability):
     city = city.strip().title()
     location_key = "recycle" if repairability == "Not Repairable" else "repair"
     location_type = "Recycling Centers" if location_key == "recycle" else "Repair Shops"
-    keyword = "e-waste recycling" if location_key == "recycle" else "{device_name} repair shop"
+    keyword = "e-waste recycling" if location_key == "recycle" else "electronics repair shop"
     view_all_url = (
         f"https://www.google.com/maps/search/"
         f"{urllib.parse.quote(keyword + ' near me')}/@{user_lat},{user_lon},14z"

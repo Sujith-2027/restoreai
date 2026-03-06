@@ -1,0 +1,9 @@
+{
+  "Air Conditioner": 0,
+  "Fridge": 1,
+  "Laptop": 2,
+  "Mobile-tablet": 3,
+  "Television": 4,
+  "Washing machine": 5,
+  "others": 6
+}

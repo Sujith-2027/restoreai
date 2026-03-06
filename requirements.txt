@@ -1,7 +1,7 @@
 flask==2.3.0
 tensorflow==2.13.0
-numpy==1.24.3
+numpy==1.24.4
 pillow==10.0.0
-opencv-python
+opencv-python-headless
 werkzeug==2.3.0
 reportlab==4.0.4

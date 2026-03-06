@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: restoreai
+    env: python
+    buildCommand: "pip install -r requirements.txt && python setup_map.py"
+    startCommand: "gunicorn app_final:app --bind 0.0.0.0:$PORT --timeout 120"
+    plan: free

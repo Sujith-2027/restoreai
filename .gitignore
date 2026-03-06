@@ -1,0 +1,11 @@
+venv/
+models/
+uploads/
+dataset/
+__pycache__/
+*.pyc
+*.pkl
+*.h5
+*.pt
+*.onnx
+.env

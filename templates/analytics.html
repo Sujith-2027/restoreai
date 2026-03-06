@@ -1,0 +1,482 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics Dashboard - ReStoreAI{% endblock %}
+
+{% block extra_css %}
+<style>
+.dashboard-header{
+    text-align:center;
+    margin-bottom:50px;
+}
+.dashboard-header h1{
+    font-size:38px;
+    font-weight:800;
+}
+.stats-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:20px;
+    margin-bottom:50px;
+}
+.stat-card{
+    background:var(--card);
+    padding:30px;
+    border-radius:16px;
+    border:1px solid #334155;
+    text-align:center;
+    transition:0.25s ease;
+}
+.stat-card:hover{
+    transform:translateY(-5px);
+    border-color:var(--accent);
+}
+.stat-number{
+    font-size:42px;
+    font-weight:800;
+    color:var(--accent);
+    margin:10px 0;
+}
+.stat-label{
+    font-size:13px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:1px;
+}
+.chart-container{
+    background:var(--card);
+    padding:30px;
+    border-radius:16px;
+    border:1px solid #334155;
+    margin-bottom:25px;
+}
+.chart-title{
+    font-size:18px;
+    font-weight:700;
+    margin-bottom:20px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+canvas{
+    max-height:320px;
+}
+.chart-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(450px,1fr));
+    gap:25px;
+    margin-bottom:25px;
+}
+.predictions-table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:20px;
+}
+.predictions-table th{
+    background:var(--accent);
+    color:white;
+    padding:14px;
+    text-align:left;
+    font-weight:600;
+    font-size:13px;
+}
+.predictions-table td{
+    padding:14px;
+    border-bottom:1px solid #334155;
+    font-size:14px;
+}
+.predictions-table tr:hover{
+    background:rgba(16,185,129,0.05);
+}
+.gauge-container{
+    position:relative;
+    width:200px;
+    height:200px;
+    margin:20px auto;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+
+<div class="dashboard-header">
+<h1>📊 Analytics Dashboard</h1>
+<p style="color:var(--muted); font-size:15px;">Comprehensive analysis with 11+ interactive visualizations</p>
+</div>
+
+<!-- Statistics Cards -->
+<div class="stats-grid">
+<div class="stat-card">
+<div class="stat-label">Total Analyses</div>
+<div class="stat-number">{{ total_analyses }}</div>
+</div>
+<div class="stat-card">
+<div class="stat-label">Repairable Rate</div>
+<div class="stat-number">{{ repairable_percent }}%</div>
+</div>
+<div class="stat-card">
+<div class="stat-label">Most Common</div>
+<div class="stat-number" style="font-size:22px;">{{ most_common_device }}</div>
+</div>
+<div class="stat-card">
+<div class="stat-label">Avg Confidence</div>
+<div class="stat-number">{{ avg_confidence }}%</div>
+</div>
+<div class="stat-card">
+<div class="stat-label">Avg Damage</div>
+<div class="stat-number">{{ avg_damage }}%</div>
+</div>
+<div class="stat-card">
+<div class="stat-label">Avg Repair Cost</div>
+<div class="stat-number" style="font-size:28px;">₹{{ avg_cost }}</div>
+</div>
+</div>
+
+<!-- Row 1: Repairability Donut + Device Breakdown Bar -->
+<div class="chart-grid">
+<div class="chart-container">
+<div class="chart-title">🍩 1. Repairability Distribution</div>
+<canvas id="repairabilityChart"></canvas>
+</div>
+<div class="chart-container">
+<div class="chart-title">📊 2. Device Type Breakdown</div>
+<canvas id="deviceChart"></canvas>
+</div>
+</div>
+
+<!-- Row 2: Damage Composition Stacked + Confidence vs Damage Scatter -->
+<div class="chart-grid">
+<div class="chart-container">
+<div class="chart-title">📚 3. Damage Composition (Stacked)</div>
+<canvas id="damageStackedChart"></canvas>
+</div>
+<div class="chart-container">
+<div class="chart-title">🎯 4. Confidence vs Damage</div>
+<canvas id="scatterChart"></canvas>
+</div>
+</div>
+
+<!-- Row 3: Age vs Cost Line + Timeline Trend -->
+<div class="chart-grid">
+<div class="chart-container">
+<div class="chart-title">💰 5. Age vs Repair Cost</div>
+<canvas id="ageCostChart"></canvas>
+</div>
+<div class="chart-container">
+<div class="chart-title">📈 6. Daily Analysis Timeline</div>
+<canvas id="timelineChart"></canvas>
+</div>
+</div>
+
+<!-- Row 4: Cost Distribution Histogram + City Distribution -->
+<div class="chart-grid">
+<div class="chart-container">
+<div class="chart-title">📊 7. Repair Cost Distribution</div>
+<canvas id="costHistogram"></canvas>
+</div>
+<div class="chart-container">
+<div class="chart-title">🌍 8. City-wise Analysis</div>
+<canvas id="cityChart"></canvas>
+</div>
+</div>
+
+<!-- Row 5: Repairability by Device + Damage Gauge -->
+<div class="chart-grid">
+<div class="chart-container">
+<div class="chart-title">📊 9. Repairability by Device</div>
+<canvas id="deviceRepairChart"></canvas>
+</div>
+<div class="chart-container">
+<div class="chart-title">🎚️ 10. Overall Damage Severity</div>
+<div class="gauge-container">
+<canvas id="damageGauge"></canvas>
+</div>
+<div style="text-align:center; margin-top:20px;">
+<span style="font-size:32px; font-weight:800; color:var(--accent);">{{ avg_damage }}%</span>
+<p style="color:var(--muted); margin-top:5px;">Average Damage Score</p>
+</div>
+</div>
+</div>
+
+<!-- Full Width: Confidence Trend Over Time -->
+<div class="chart-container">
+<div class="chart-title">📈 11. Average AI Confidence Trend Over Time</div>
+<canvas id="confidenceTrendChart"></canvas>
+</div>
+
+<!-- Recent Predictions Table -->
+<div class="chart-container">
+<div class="chart-title">📋 Recent Predictions</div>
+<table class="predictions-table">
+<thead>
+<tr>
+<th>Date</th>
+<th>Device</th>
+<th>Confidence</th>
+<th>Repairability</th>
+<th>Damage</th>
+<th>Age</th>
+<th>Location</th>
+</tr>
+</thead>
+<tbody>
+{% for pred in recent_predictions %}
+<tr>
+<td>{{ pred.timestamp }}</td>
+<td><strong>{{ pred.device }}</strong></td>
+<td>{{ pred.confidence }}%</td>
+<td><span class="repair-badge status-{{ pred.repairability_class }}" style="padding:4px 10px; border-radius:12px; font-size:12px;">{{ pred.repairability }}</span></td>
+<td><strong>{{ pred.damage }}%</strong></td>
+<td>{{ pred.age }} yrs</td>
+<td>{{ pred.location }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+<div style="text-align:center; margin-top:40px;">
+<a href="/" class="btn">🏠 Back to Home</a>
+</div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+
+const chartColors = {
+    green: '#10b981',
+    yellow: '#eab308',
+    red: '#ef4444',
+    blue: '#3b82f6',
+    purple: '#a855f7',
+    pink: '#ec4899',
+    orange: '#f97316'
+};
+
+// 1. Repairability Donut Chart
+new Chart(document.getElementById('repairabilityChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Repairable', 'Mostly Repairable', 'Not Repairable'],
+        datasets: [{
+            data: {{ repairability_data|safe }},
+            backgroundColor: [chartColors.green, chartColors.yellow, chartColors.red],
+            borderWidth: 0
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: { position: 'bottom' }
+        }
+    }
+});
+
+// 2. Device Type Bar Chart
+new Chart(document.getElementById('deviceChart'), {
+    type: 'bar',
+    data: {
+        labels: {{ device_labels|safe }},
+        datasets: [{
+            label: 'Count',
+            data: {{ device_data|safe }},
+            backgroundColor: [chartColors.green, chartColors.blue, chartColors.yellow, chartColors.red, chartColors.purple, chartColors.pink]
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+    }
+});
+
+// 3. Damage Composition Stacked Bar
+new Chart(document.getElementById('damageStackedChart'), {
+    type: 'bar',
+    data: {
+        labels: {{ device_labels|safe }},
+        datasets: [
+            { label: 'Cracks', data: {{ cracks_data|safe }}, backgroundColor: chartColors.blue },
+            { label: 'Rust', data: {{ rust_data|safe }}, backgroundColor: chartColors.orange },
+            { label: 'Broken', data: {{ broken_data|safe }}, backgroundColor: chartColors.red }
+        ]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom' } },
+        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+    }
+});
+
+// 4. Confidence vs Damage Scatter Plot
+new Chart(document.getElementById('scatterChart'), {
+    type: 'scatter',
+    data: {
+        datasets: [{
+            label: 'Confidence vs Damage',
+            data: {{ scatter_data|safe }},
+            backgroundColor: chartColors.green
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { title: { display: true, text: 'Damage %' } },
+            y: { title: { display: true, text: 'Confidence %' } }
+        }
+    }
+});
+
+// 5. Age vs Repair Cost Line Graph
+new Chart(document.getElementById('ageCostChart'), {
+    type: 'line',
+    data: {
+        labels: {{ age_labels|safe }},
+        datasets: [{
+            label: 'Avg Cost',
+            data: {{ age_cost_data|safe }},
+            borderColor: chartColors.green,
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            tension: 0.4,
+            fill: true
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+    }
+});
+
+// 6. Daily Timeline Trend
+new Chart(document.getElementById('timelineChart'), {
+    type: 'line',
+    data: {
+        labels: {{ timeline_labels|safe }},
+        datasets: [{
+            label: 'Analyses',
+            data: {{ timeline_data|safe }},
+            borderColor: chartColors.blue,
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            tension: 0.4,
+            fill: true,
+            borderWidth: 3
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+    }
+});
+
+// 7. Cost Distribution Histogram
+new Chart(document.getElementById('costHistogram'), {
+    type: 'bar',
+    data: {
+        labels: ['0-5k', '5k-10k', '10k-15k', '15k-20k', '20k+'],
+        datasets: [{
+            label: 'Frequency',
+            data: {{ cost_distribution|safe }},
+            backgroundColor: chartColors.purple
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+    }
+});
+
+// 8. City-wise Analysis
+new Chart(document.getElementById('cityChart'), {
+    type: 'pie',
+    data: {
+        labels: {{ city_labels|safe }},
+        datasets: [{
+            data: {{ city_data|safe }},
+            backgroundColor: [chartColors.green, chartColors.blue, chartColors.yellow, chartColors.red]
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { position: 'right' } }
+    }
+});
+
+// 9. Repairability by Device (Grouped Bar)
+new Chart(document.getElementById('deviceRepairChart'), {
+    type: 'bar',
+    data: {
+        labels: {{ device_labels|safe }},
+        datasets: [
+            { label: 'Repairable', data: {{ device_repairable|safe }}, backgroundColor: chartColors.green },
+            { label: 'Mostly', data: {{ device_mostly|safe }}, backgroundColor: chartColors.yellow },
+            { label: 'Not', data: {{ device_not|safe }}, backgroundColor: chartColors.red }
+        ]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom' } },
+        scales: { y: { beginAtZero: true } }
+    }
+});
+
+// 10. Damage Severity Gauge (Doughnut as Gauge)
+new Chart(document.getElementById('damageGauge'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Damage', 'Remaining'],
+        datasets: [{
+            data: [{{ avg_damage }}, {{ 100 - avg_damage }}],
+            backgroundColor: [
+                {{ avg_damage }} < 25 ? chartColors.green : {{ avg_damage }} < 55 ? chartColors.yellow : chartColors.red,
+                '#1f2937'
+            ],
+            borderWidth: 0,
+            circumference: 180,
+            rotation: 270
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: { legend: { display: false } }
+    }
+});
+
+// 11. Confidence Trend Over Time
+new Chart(document.getElementById('confidenceTrendChart'), {
+    type: 'line',
+    data: {
+        labels: {{ timeline_labels|safe }},
+        datasets: [{
+            label: 'Average Confidence %',
+            data: {{ confidence_trend|safe }},
+            borderColor: chartColors.green,
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            tension: 0.4,
+            fill: true,
+            borderWidth: 3,
+            pointRadius: 5,
+            pointBackgroundColor: chartColors.green
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            y: { min: 90, max: 100, title: { display: true, text: 'Confidence %' } }
+        }
+    }
+});
+
+</script>
+{% endblock %}

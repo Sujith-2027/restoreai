@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}Get Report - ReStoreAI{% endblock %}
+
+{% block extra_css %}
+<style>
+
+/* ===== Container ===== */
+.report-container{
+    max-width:640px;
+    margin:100px auto;
+    padding:60px;
+    background:linear-gradient(145deg,#0f172a,#111827);
+    border-radius:28px;
+    border:1px solid #1f2937;
+    text-align:center;
+    box-shadow:0 30px 80px rgba(0,0,0,0.4);
+}
+
+/* ===== Header ===== */
+.report-header{
+    margin-bottom:50px;
+}
+.report-header h1{
+    font-size:38px;
+    font-weight:900;
+    letter-spacing:-0.5px;
+}
+.report-header p{
+    color:var(--muted);
+    font-size:16px;
+    margin-top:10px;
+}
+
+/* ===== Form ===== */
+.form-group{
+    margin:40px 0;
+}
+.form-group label{
+    display:block;
+    font-size:12px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:2px;
+    color:var(--muted);
+    margin-bottom:14px;
+}
+
+/* ===== Input ===== */
+.form-group input{
+    width:100%;
+    padding:20px;
+    font-size:20px;
+    border:1px solid #1f2937;
+    border-radius:16px;
+    background:#0b1220;
+    color:white;
+    text-align:center;
+    font-family:monospace;
+    font-weight:800;
+    letter-spacing:2px;
+    transition:all 0.3s ease;
+}
+.form-group input:focus{
+    outline:none;
+    border-color:var(--accent);
+    box-shadow:0 0 0 4px rgba(16,185,129,0.15);
+}
+.form-group input::placeholder{
+    color:#475569;
+}
+
+/* ===== Button ===== */
+.submit-btn{
+    width:100%;
+    padding:18px;
+    background:linear-gradient(135deg,var(--accent),#059669);
+    color:white;
+    border:none;
+    border-radius:40px;
+    font-size:15px;
+    font-weight:800;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    cursor:pointer;
+    transition:all 0.3s ease;
+}
+.submit-btn:hover{
+    transform:translateY(-4px);
+    box-shadow:0 15px 35px rgba(16,185,129,0.35);
+}
+
+/* ===== Error ===== */
+.error-message{
+    background:rgba(220,38,38,0.12);
+    color:#ef4444;
+    padding:16px;
+    border-radius:14px;
+    border:1px solid rgba(220,38,38,0.3);
+    margin:25px 0;
+    font-weight:600;
+    font-size:14px;
+}
+
+/* ===== Info Box ===== */
+.info-box{
+    background:#0b1220;
+    padding:25px;
+    border-radius:20px;
+    border:1px solid #1f2937;
+    margin:40px 0 20px 0;
+}
+.info-box p{
+    font-size:12px;
+    color:var(--muted);
+    margin-bottom:10px;
+}
+.info-box .example{
+    font-family:monospace;
+    font-size:18px;
+    font-weight:800;
+    color:var(--accent);
+    letter-spacing:2px;
+}
+
+/* ===== Back Link ===== */
+.back-link{
+    margin-top:30px;
+}
+.back-link a{
+    color:var(--muted);
+    text-decoration:none;
+    font-size:14px;
+    font-weight:600;
+    transition:0.3s ease;
+}
+.back-link a:hover{
+    color:var(--accent);
+}
+
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="report-container">
+
+<div class="report-header">
+<h1>Get Your Report</h1>
+<p>Enter your receipt number to retrieve your AI device analysis</p>
+</div>
+
+{% with messages = get_flashed_messages() %}
+{% if messages %}
+<div class="error-message">
+❌ {{ messages[0] }}
+</div>
+{% endif %}
+{% endwith %}
+
+<form method="POST">
+<div class="form-group">
+<label>Receipt Number</label>
+<input 
+    type="text" 
+    name="receipt_number" 
+    placeholder="RST-20260228123456-A7K9" 
+    required
+    autocomplete="off"
+>
+</div>
+
+<button type="submit" class="submit-btn">
+Download Report
+</button>
+</form>
+
+<div class="info-box">
+<p>Example Receipt Number</p>
+<div class="example">RST-20260228123456-A7K9</div>
+</div>
+
+<div class="back-link">
+<a href="/">← Back to Home</a>
+</div>
+
+</div>
+{% endblock %}

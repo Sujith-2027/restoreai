@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+
+{% block title %}Home - ReStoreAI{% endblock %}
+
+{% block extra_css %}
+<style>
+
+/* ===== Hero Section ===== */
+.home-header{
+    text-align:center;
+    margin-bottom:100px;
+}
+
+.home-header h1{
+    font-size:56px;
+    font-weight:900;
+    letter-spacing:-1px;
+    background:linear-gradient(90deg,var(--accent),#38bdf8);
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+}
+
+.home-header p{
+    font-size:18px;
+    color:var(--muted);
+    margin-top:20px;
+    max-width:650px;
+    margin-left:auto;
+    margin-right:auto;
+}
+
+/* Hero Badge */
+.home-header span{
+    display:inline-block;
+    margin-top:30px;
+    padding:20px 40px;
+    border-radius:40px;
+    font-size:13px;
+    font-weight:700;
+    letter-spacing:1px;
+    background:rgba(16,185,129,0.12);
+    color:var(--accent);
+    border:1px solid rgba(16,185,129,0.3);
+}
+
+/* ===== Options Grid ===== */
+.options-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+    gap:40px;
+    margin:80px 0;
+}
+
+/* ===== Option Cards ===== */
+.option-card{
+    background:var(--card);
+    padding:55px;
+    border-radius:28px;
+    border:1px solid #1f2937;
+    text-align:center;
+    transition:all 0.35s ease;
+}
+
+.option-card:hover{
+    transform:translateY(-12px);
+    border-color:var(--accent);
+    box-shadow:0 30px 70px rgba(0,0,0,0.4);
+}
+
+.option-card h2{
+    font-size:28px;
+    font-weight:800;
+    margin-bottom:18px;
+}
+
+.option-card p{
+    color:var(--muted);
+    font-size:15px;
+    line-height:1.7;
+    margin-bottom:35px;
+}
+
+.option-card .btn{
+    width:100%;
+    border-radius:40px;
+    padding:14px;
+    font-weight:700;
+    transition:0.3s ease;
+}
+
+.option-card .btn:hover{
+    transform:translateY(-4px);
+}
+
+/* ===== About Section ===== */
+.about-section{
+    background:var(--card);
+    padding:70px;
+    border-radius:28px;
+    border:1px solid #1f2937;
+    margin-top:100px;
+    text-align:center;
+}
+
+.about-section h3{
+    font-size:26px;
+    font-weight:900;
+    margin-bottom:25px;
+    text-align:center;
+}
+
+.about-section p{
+    font-size:16px;
+    color:var(--muted);
+    line-height:1.8;
+    max-width:700px;
+    margin-left:auto;
+    margin-right:auto;
+}
+
+/* ===== Stats ===== */
+.stats-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+    gap:50px;
+    margin-top:60px;
+    text-align:center;
+}
+
+.stat-box{
+    text-align:center;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+}
+
+.stat-number{
+    font-size:48px;
+    font-weight:900;
+    color:var(--accent);
+}
+
+.stat-label{
+    font-size:12px;
+    color:var(--muted);
+    margin-top:8px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+}
+
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+
+    <!-- HERO -->
+    <div class="home-header" style="text-align:center;">
+        <h1>ReStoreAI</h1>
+        <p style="text-align:center; margin-left:auto; margin-right:auto;">
+            AI-Powered Device Damage Analysis &amp; Intelligent Repair Recommendation Platform
+        </p>
+        <div style="text-align:center;">
+            <span>97% Accuracy &bull; MobileNetV2 &bull; Real-Time Processing</span>
+        </div>
+    </div>
+
+    <!-- OPTIONS -->
+    <div class="options-grid">
+
+        <div class="option-card">
+            <h2>Start Analysis</h2>
+            <p>
+                Upload a device image to detect structural damage and receive intelligent repair recommendations powered by deep learning.
+            </p>
+            <a href="/analyze" class="btn">Analyze Device</a>
+        </div>
+
+        <div class="option-card">
+            <h2>Analytics Dashboard</h2>
+            <p>
+                Explore advanced insights through interactive charts, performance metrics, and repairability trends.
+            </p>
+            <a href="/analytics" class="btn">View Dashboard</a>
+        </div>
+
+        <div class="option-card">
+            <h2>Model Report</h2>
+            <p>
+                Review training performance, architecture details, confusion matrix, and AI evaluation metrics.
+            </p>
+            <a href="/model-report" class="btn">View Report</a>
+        </div>
+
+    </div>
+
+    <!-- ABOUT -->
+    <div class="about-section">
+        <h3>About ReStoreAI</h3>
+        <p>
+            ReStoreAI leverages MobileNetV2 deep learning architecture to automatically classify electronic devices,
+            analyze damage severity, and recommend repair or recycling actions.
+            The system achieves <strong style="color:var(--accent);">97.03% accuracy</strong>
+            across six major appliance categories.
+        </p>
+
+        <!-- STATS -->
+        <div class="stats-grid">
+
+            <div class="stat-box">
+                <div class="stat-number">97%</div>
+                <div class="stat-label">Model Accuracy</div>
+            </div>
+
+            <div class="stat-box">
+                <div class="stat-number">6</div>
+                <div class="stat-label">Device Categories</div>
+            </div>
+
+            <div class="stat-box">
+                <div class="stat-number">&lt;2s</div>
+                <div class="stat-label">Processing Time</div>
+            </div>
+
+            <div class="stat-box">
+                <div class="stat-number">Free</div>
+                <div class="stat-label">To Use</div>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+{% endblock %}

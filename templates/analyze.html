@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+
+{% block title %}Analyze Device - ReStoreAI{% endblock %}
+
+{% block extra_css %}
+<style>
+.upload-area{
+    border:2px dashed #334155;
+    padding:40px;
+    border-radius:16px;
+    text-align:center;
+    cursor:pointer;
+    transition:0.3s;
+    background:var(--card);
+}
+.upload-area:hover{
+    border-color:var(--accent);
+    background:#172036;
+}
+.upload-area h3{ margin-bottom:10px; }
+.upload-area p{ color:var(--muted); }
+
+input, select{
+    width:100%;
+    padding:12px;
+    margin-top:8px;
+    margin-bottom:20px;
+    border-radius:8px;
+    border:1px solid #334155;
+    background:var(--bg);
+    color:var(--text);
+    font-family:inherit;
+}
+input:focus{ outline:none; border-color:var(--accent); }
+
+.section-card{
+    background:var(--card);
+    padding:30px;
+    border-radius:18px;
+    border:1px solid #334155;
+    margin-top:30px;
+}
+.location-buttons{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:15px;
+    margin-bottom:20px;
+}
+.location-btn{
+    padding:12px;
+    text-align:center;
+    border-radius:8px;
+    border:1px solid #334155;
+    cursor:pointer;
+    transition:0.3s;
+    background:var(--bg);
+    font-weight:600;
+    color:var(--text);
+}
+.location-btn:hover{ border-color:var(--accent); color:var(--accent); }
+.location-btn.active{
+    border-color:var(--accent);
+    background:rgba(34,197,94,0.1);
+    color:var(--accent);
+}
+.info-box{
+    background:rgba(34,197,94,0.1);
+    padding:12px;
+    border-radius:8px;
+    font-size:14px;
+    margin-bottom:15px;
+    color:var(--accent);
+}
+.gps-status{
+    font-size:13px;
+    text-align:center;
+    padding:10px;
+    border-radius:8px;
+    margin-bottom:15px;
+    font-weight:500;
+}
+.gps-ok   { background:rgba(22,163,74,0.15);  color:#16a34a; }
+.gps-warn { background:rgba(234,179,8,0.15);   color:#eab308; }
+.gps-err  { background:rgba(239,68,68,0.15);   color:#ef4444; }
+
+#preview{
+    max-width:100%;
+    margin-top:20px;
+    border-radius:12px;
+    display:none;
+}
+.submit-btn{ width:100%; margin-top:30px; }
+.back-link{ text-align:center; margin-top:20px; }
+.back-link a{ color:#38bdf8; text-decoration:none; font-size:14px; }
+
+@media(max-width:768px){
+    .location-buttons{ grid-template-columns:1fr; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+
+<h1>Device Analysis</h1>
+
+<form method="POST" action="/analyze" enctype="multipart/form-data" id="mainForm">
+
+<div class="upload-area" onclick="document.getElementById('fileInput').click()">
+    <h3>Upload Device Image</h3>
+    <p>Click to select JPG / PNG / JPEG</p>
+    <input type="file" id="fileInput" name="image" accept="image/*" style="display:none" required>
+</div>
+<img id="preview" alt="Preview">
+
+<div class="section-card">
+    <h3>Device Information</h3>
+    <label>Device Age (Years)</label>
+    <input type="number" name="device_age" min="0" max="50" value="2" required>
+    <label>Additional Details (Optional)</label>
+    <input type="text" name="description" placeholder="Describe visible issues e.g. cracked screen">
+</div>
+
+<div class="section-card">
+    <h3>Location Details</h3>
+    <div class="info-box">
+        Your location is used to find the nearest repair shops.
+    </div>
+
+    <div id="gps-status" class="gps-status gps-warn">
+        Detecting your location...
+    </div>
+
+    <input type="hidden" id="latitude"  name="latitude"  value="">
+    <input type="hidden" id="longitude" name="longitude" value="">
+
+    <div class="location-buttons">
+        <div class="location-btn" id="btn-gps"    onclick="getLiveLocation()">Use Live GPS</div>
+        <div class="location-btn" id="btn-manual" onclick="showManualLocation()">Enter Manually</div>
+    </div>
+
+    <div id="manualFields" style="display:none;">
+        <label>City *</label>
+        <input type="text" id="cityInput" name="city" placeholder="e.g. Mumbai">
+        <label>Area</label>
+        <input type="text" name="area" placeholder="e.g. Mulund West">
+        <label>State</label>
+        <input type="text" name="state" value="Maharashtra">
+        <label>Pincode</label>
+        <input type="text" name="pincode" placeholder="e.g. 400080">
+    </div>
+</div>
+
+<button type="submit" class="btn submit-btn">Analyze Device</button>
+
+</form>
+
+<div class="back-link">
+    <a href="/">Back to Home</a>
+</div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('fileInput').addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    if (file) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var img = document.getElementById('preview');
+            img.src = e.target.result;
+            img.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+function setStatus(msg, type) {
+    var el = document.getElementById('gps-status');
+    el.textContent = msg;
+    el.className = 'gps-status ' + (type || 'gps-warn');
+}
+
+function showManualLocation() {
+    document.getElementById('manualFields').style.display = 'block';
+    document.getElementById('btn-manual').classList.add('active');
+}
+
+function getLiveLocation() {
+    setStatus('Getting your GPS location...', 'gps-warn');
+    document.getElementById('btn-gps').classList.add('active');
+    if (!navigator.geolocation) {
+        setStatus('GPS not supported. Please enter manually.', 'gps-err');
+        showManualLocation();
+        return;
+    }
+    navigator.geolocation.getCurrentPosition(
+        function(pos) {
+            var lat = pos.coords.latitude.toFixed(6);
+            var lon = pos.coords.longitude.toFixed(6);
+            document.getElementById('latitude').value  = lat;
+            document.getElementById('longitude').value = lon;
+            setStatus('Location captured: ' + lat + ', ' + lon, 'gps-ok');
+            fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lon,
+                  { headers: { 'Accept-Language': 'en' } })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var addr = data.address || {};
+                var city = addr.city || addr.town || addr.village || addr.county || '';
+                var area = addr.suburb || addr.neighbourhood || '';
+                if (city) {
+                    showManualLocation();
+                    document.getElementById('cityInput').value = city;
+                    var areaEl = document.querySelector('[name=area]');
+                    if (areaEl && area) areaEl.value = area;
+                    setStatus('Location: ' + (area ? area + ', ' : '') + city, 'gps-ok');
+                }
+            })
+            .catch(function() {});
+        },
+        function(err) {
+            var msgs = { 1:'Permission denied', 2:'Position unavailable', 3:'Timeout' };
+            setStatus('GPS failed: ' + (msgs[err.code] || 'Unknown') + '. Enter manually.', 'gps-err');
+            showManualLocation();
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    getLiveLocation();
+});
+
+document.getElementById('mainForm').addEventListener('submit', function(e) {
+    var lat  = document.getElementById('latitude').value;
+    var city = document.getElementById('cityInput').value;
+    if (!lat && !city) {
+        e.preventDefault();
+        setStatus('Please allow GPS or enter your city.', 'gps-err');
+        showManualLocation();
+        return;
+    }
+    if (lat && !city) {
+        var h = document.createElement('input');
+        h.type = 'hidden'; h.name = 'city'; h.value = 'Mumbai';
+        this.appendChild(h);
+    }
+});
+</script>
+{% endblock %}

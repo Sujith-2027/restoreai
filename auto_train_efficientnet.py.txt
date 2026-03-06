@@ -1,0 +1,55 @@
+cd C:\Users\msuji\Downloads\ReStoreAI
+
+rmdir /s /q working_dataset
+rmdir /s /q dataset_split
+rmdir /s /q open_images_dataset
+rmdir /s /q __pycache__
+rmdir /s /q templates
+rmdir /s /q static
+rmdir /s /q reports
+rmdir /s /q services
+rmdir /s /q helpers
+
+del data.py
+del data1.py
+del data2.py
+del auto_train_final.py
+del auto_train_efficientnet.py
+del rust_detection.py
+del ml_utils.py
+del train_image_model.py
+del confusion_matrix.py
+del text_predictions_for_report.py
+del dataset_analysis.py
+del rectify.py
+del .env
+del Profil
+del database_table.sql
+del db.py
+del .gitignore
+```
+
+---
+
+## 📦 **FINAL PROJECT STRUCTURE:**
+
+After cleanup, you should have:
+```
+ReStoreAI/
+├── dataset/                          # Training data
+│   ├── Air_Conditioner/
+│   ├── Fridge/
+│   ├── Laptop/
+│   ├── Mobile_Tablet/
+│   ├── Television/
+│   └── Washing_machine/
+├── models/                           # Trained models
+│   ├── best_mobilenet_weights.h5    # ⭐ Best model
+│   └── mobilenet_architecture.json
+├── uploads/                          # Web app uploads
+├── train_optimized.py               # ⭐ Training script
+├── app_mobilenet.py                 # ⭐ Web application
+├── auto_train_no_checkpoint.py      # Backup training
+├── main.py                          # CLI testing
+├── README.md                        # Documentation
+└── requirements.txt                 # Dependencies

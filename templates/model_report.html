@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+
+{% block title %}Model Report - ReStoreAI{% endblock %}
+
+{% block extra_css %}
+<style>
+
+/* ===== Header ===== */
+.report-header{
+    text-align:center;
+    margin-bottom:70px;
+}
+.report-header h1{
+    font-size:44px;
+    font-weight:900;
+    letter-spacing:-1px;
+}
+.report-header p{
+    color:var(--muted);
+    font-size:16px;
+    margin-top:10px;
+}
+
+/* ===== Info Cards ===== */
+.info-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:30px;
+    margin-bottom:60px;
+}
+.info-card{
+    background:linear-gradient(145deg,#0f172a,#111827);
+    padding:30px;
+    border-radius:24px;
+    border:1px solid #1f2937;
+    text-align:center;
+    transition:0.3s ease;
+}
+.info-card:hover{
+    transform:translateY(-8px);
+    border-color:var(--accent);
+}
+.info-label{
+    font-size:12px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:2px;
+    margin-bottom:10px;
+}
+.info-value{
+    font-size:26px;
+    font-weight:800;
+    color:var(--accent);
+}
+
+/* ===== Sections ===== */
+.section{
+    background:linear-gradient(145deg,#0f172a,#111827);
+    padding:40px;
+    border-radius:28px;
+    border:1px solid #1f2937;
+    margin-bottom:40px;
+}
+.section-title{
+    font-size:22px;
+    font-weight:800;
+    margin-bottom:25px;
+}
+
+/* ===== Metrics Table ===== */
+.metrics-table{
+    width:100%;
+    border-collapse:collapse;
+}
+.metrics-table td{
+    padding:14px 10px;
+    border-bottom:1px solid #1f2937;
+    font-size:15px;
+}
+.metrics-table td:first-child{
+    font-weight:600;
+    color:var(--muted);
+}
+.metrics-table tr:last-child td{
+    border-bottom:none;
+}
+
+/* ===== Per-Class Accuracy Cards ===== */
+.class-card{
+    background:#0b1220;
+    padding:25px;
+    border-radius:18px;
+    border:1px solid #1f2937;
+    transition:0.3s ease;
+}
+.class-card:hover{
+    border-color:var(--accent);
+}
+.class-name{
+    font-size:14px;
+    color:var(--muted);
+    margin-bottom:10px;
+}
+.class-acc{
+    font-size:30px;
+    font-weight:900;
+    color:var(--accent);
+}
+.progress-bar{
+    width:100%;
+    height:8px;
+    background:#1f2937;
+    border-radius:6px;
+    margin-top:12px;
+}
+.progress-fill{
+    height:100%;
+    background:var(--accent);
+    border-radius:6px;
+}
+
+/* ===== Confusion Matrix ===== */
+.confusion-matrix{
+    overflow-x:auto;
+    margin-top:20px;
+}
+.confusion-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:14px;
+}
+.confusion-table th{
+    background:var(--accent);
+    color:white;
+    padding:12px;
+    font-weight:700;
+}
+.confusion-table td{
+    padding:12px;
+    text-align:center;
+    border:1px solid #1f2937;
+}
+.confusion-table .correct{
+    background:rgba(16,185,129,0.25);
+    font-weight:800;
+}
+
+/* ===== Architecture ===== */
+.architecture{
+    font-family:monospace;
+    font-size:14px;
+    line-height:2;
+    color:var(--muted);
+}
+.architecture div{
+    margin:6px 0;
+}
+
+/* ===== Back Button ===== */
+.back-home{
+    text-align:center;
+    margin-top:50px;
+}
+
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+
+<div class="report-header">
+<h1>Model Performance Report</h1>
+<p>MobileNetV2 Architecture · Training Metrics · Evaluation Results</p>
+</div>
+
+<!-- Model Info -->
+<div class="info-grid">
+<div class="info-card">
+<div class="info-label">Model</div>
+<div class="info-value" style="font-size:18px;">{{ model_info.name }}</div>
+</div>
+<div class="info-card">
+<div class="info-label">Accuracy</div>
+<div class="info-value">{{ model_info.accuracy }}%</div>
+</div>
+<div class="info-card">
+<div class="info-label">Parameters</div>
+<div class="info-value">{{ model_info.parameters }}</div>
+</div>
+<div class="info-card">
+<div class="info-label">Input Size</div>
+<div class="info-value" style="font-size:18px;">{{ model_info.input_size }}</div>
+</div>
+<div class="info-card">
+<div class="info-label">Classes</div>
+<div class="info-value">{{ model_info.classes }}</div>
+</div>
+<div class="info-card">
+<div class="info-label">Framework</div>
+<div class="info-value" style="font-size:16px;">{{ model_info.framework }}</div>
+</div>
+</div>
+
+<!-- Training Metrics -->
+<div class="section">
+<div class="section-title">Training Metrics</div>
+<table class="metrics-table">
+<tr><td>Epochs</td><td><strong>{{ training_metrics.epochs }}</strong></td></tr>
+<tr><td>Batch Size</td><td><strong>{{ training_metrics.batch_size }}</strong></td></tr>
+<tr><td>Learning Rate</td><td><strong>{{ training_metrics.learning_rate }}</strong></td></tr>
+<tr><td>Optimizer</td><td><strong>{{ training_metrics.optimizer }}</strong></td></tr>
+<tr><td>Loss Function</td><td><strong>{{ training_metrics.loss }}</strong></td></tr>
+<tr><td>Final Training Accuracy</td><td><strong style="color:var(--accent);">{{ training_metrics.final_train_acc }}%</strong></td></tr>
+<tr><td>Final Validation Accuracy</td><td><strong style="color:var(--accent);">{{ training_metrics.final_val_acc }}%</strong></td></tr>
+<tr><td>Training Time</td><td><strong>{{ training_metrics.training_time }}</strong></td></tr>
+</table>
+</div>
+
+<!-- Per Class Accuracy -->
+<div class="section">
+<div class="section-title">Per-Class Accuracy</div>
+<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:20px;">
+{% for device, acc in class_accuracy.items() %}
+<div class="class-card">
+<div class="class-name">{{ device }}</div>
+<div class="class-acc">{{ acc }}%</div>
+<div class="progress-bar">
+<div class="progress-fill" style="width:{{ acc }}%;"></div>
+</div>
+</div>
+{% endfor %}
+</div>
+</div>
+
+<!-- Confusion Matrix -->
+<div class="section">
+<div class="section-title">Confusion Matrix</div>
+<p style="color:var(--muted); margin-bottom:20px;">Diagonal values represent correct predictions.</p>
+<div class="confusion-matrix">
+<table class="confusion-table">
+<thead>
+<tr>
+<th>Predicted →<br>Actual ↓</th>
+{% for name in class_names %}
+<th>{{ name.replace('_', ' ') }}</th>
+{% endfor %}
+</tr>
+</thead>
+<tbody>
+{% for i in range(class_names|length) %}
+<tr>
+<th>{{ class_names[i].replace('_', ' ') }}</th>
+{% for j in range(class_names|length) %}
+<td {% if i == j %}class="correct"{% endif %}>{{ confusion_matrix[i][j] }}</td>
+{% endfor %}
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</div>
+
+<!-- Architecture -->
+<div class="section">
+<div class="section-title">Model Architecture</div>
+<div class="architecture">
+<div><strong>Input:</strong> 224x224x3 RGB</div>
+<div>↓</div>
+<div><strong>MobileNetV2 Base</strong> (Pretrained)</div>
+<div>↓</div>
+<div>GlobalAveragePooling2D</div>
+<div>↓</div>
+<div>Dense (256, ReLU)</div>
+<div>↓</div>
+<div>Dropout (0.5)</div>
+<div>↓</div>
+<div>BatchNormalization</div>
+<div>↓</div>
+<div>Dense (128, ReLU)</div>
+<div>↓</div>
+<div>Dropout (0.3)</div>
+<div>↓</div>
+<div><strong>Output (6 Classes, Softmax)</strong></div>
+</div>
+</div>
+
+<div class="back-home">
+<a href="/" class="btn">Back to Home</a>
+</div>
+
+</div>
+{% endblock %}

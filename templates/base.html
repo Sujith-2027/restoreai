@@ -4,8 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}ReStoreAI{% endblock %}</title>
-
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f172a'/><text y='72' x='50' text-anchor='middle' font-size='60' font-family='Arial'>&#128295;</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script>
+// Apply saved theme BEFORE page renders to avoid flash
+(function(){
+    if(localStorage.getItem('theme') === 'light'){
+        document.documentElement.classList.add('light-mode-pre');
+    }
+})();
+</script>
 
 <style>
 :root{
@@ -21,9 +29,102 @@ body.light-mode{
     --bg:#f8fafc;
     --card:#ffffff;
     --text:#0f172a;
-    --muted:#475569;
+    --muted:#334155;
     --accent:#16a34a;
     --nav:#ffffff;
+}
+
+/* Light mode text overrides */
+body.light-mode h1,
+body.light-mode h2,
+body.light-mode h3,
+body.light-mode h4,
+body.light-mode h5,
+body.light-mode h6 {
+    color:#0f172a !important;
+    -webkit-text-fill-color:#0f172a !important;
+    background:none !important;
+}
+
+body.light-mode p,
+body.light-mode label,
+body.light-mode span:not(.btn):not(.nav-links a),
+body.light-mode li,
+body.light-mode td,
+body.light-mode th {
+    color:#334155 !important;
+}
+
+body.light-mode .stat-number {
+    color:var(--accent) !important;
+    -webkit-text-fill-color:var(--accent) !important;
+}
+
+body.light-mode input,
+body.light-mode select,
+body.light-mode textarea {
+    color:#0f172a !important;
+    background:#f1f5f9 !important;
+    border-color:#cbd5e1 !important;
+}
+
+body.light-mode .card,
+body.light-mode .option-card,
+body.light-mode .about-section,
+body.light-mode .section-card {
+    border-color:#e2e8f0 !important;
+}
+
+body.light-mode .upload-area {
+    background:#f0fdf4 !important;
+    border-color:#16a34a !important;
+}
+
+body.light-mode .upload-area h3,
+body.light-mode .upload-area p {
+    color:#0f172a !important;
+}
+
+body.light-mode nav {
+    border-bottom-color:#e2e8f0 !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+body.light-mode .nav-links a {
+    color:#475569 !important;
+}
+
+body.light-mode .nav-links a:hover {
+    background:#f1f5f9 !important;
+    color:#0f172a !important;
+}
+
+body.light-mode .footer {
+    border-top-color:#e2e8f0 !important;
+}
+
+body.light-mode .footer p {
+    color:#64748b !important;
+}
+
+body.light-mode .gps-status {
+    color:#0f172a !important;
+}
+
+body.light-mode .info-box {
+    color:#16a34a !important;
+}
+
+body.light-mode .location-btn {
+    background:#f8fafc !important;
+    color:#0f172a !important;
+    border-color:#cbd5e1 !important;
+}
+
+body.light-mode .location-btn:hover,
+body.light-mode .location-btn.active {
+    border-color:#16a34a !important;
+    color:#16a34a !important;
 }
 
 *{
@@ -185,6 +286,55 @@ button:hover,.btn:hover{
 }
 
 {% block extra_css %}{% endblock %}
+
+/* Processing overlay */
+#processing-overlay{
+    display:none;
+    position:fixed;
+    top:0; left:0; width:100%; height:100%;
+    background:rgba(15,23,42,0.95);
+    z-index:9999;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+}
+#processing-overlay.active{ display:flex; }
+.proc-spinner{
+    width:70px; height:70px;
+    border:5px solid #1e293b;
+    border-top:5px solid #22c55e;
+    border-radius:50%;
+    animation:spin 1s linear infinite;
+    margin-bottom:30px;
+}
+@keyframes spin{ to{ transform:rotate(360deg); } }
+.proc-title{
+    font-size:24px; font-weight:700;
+    color:#e2e8f0; margin-bottom:12px;
+}
+.proc-sub{
+    font-size:15px; color:#94a3b8;
+    margin-bottom:30px;
+}
+.proc-steps{
+    display:flex; gap:12px;
+    flex-wrap:wrap; justify-content:center;
+}
+.proc-step{
+    padding:8px 18px;
+    border-radius:20px;
+    background:#1e293b;
+    color:#94a3b8;
+    font-size:13px;
+    border:1px solid #334155;
+    transition:0.5s;
+}
+.proc-step.done{
+    background:rgba(34,197,94,0.15);
+    color:#22c55e;
+    border-color:#22c55e;
+}
 </style>
 </head>
 
@@ -218,8 +368,58 @@ button:hover,.btn:hover{
 
 <script>
 function toggleTheme(){
-document.body.classList.toggle("light-mode");
+    var isLight = document.body.classList.toggle("light-mode");
+    localStorage.setItem('theme', isLight ? 'light' : 'dark');
+    var btn = document.querySelector('.theme-toggle');
+    if(btn) btn.textContent = isLight ? 'Dark' : 'Light';
 }
+
+// Apply saved theme on load
+document.addEventListener('DOMContentLoaded', function(){
+    if(localStorage.getItem('theme') === 'light'){
+        document.body.classList.add('light-mode');
+        var btn = document.querySelector('.theme-toggle');
+        if(btn) btn.textContent = 'Dark';
+    }
+});
+</script>
+
+<!-- Processing overlay -->
+<div id="processing-overlay">
+    <div class="proc-spinner"></div>
+    <div class="proc-title">Analyzing Your Device...</div>
+    <div class="proc-sub">Our AI is processing your image</div>
+    <div class="proc-steps">
+        <span class="proc-step" id="ps1">Uploading Image</span>
+        <span class="proc-step" id="ps2">Running AI Model</span>
+        <span class="proc-step" id="ps3">Damage Analysis</span>
+        <span class="proc-step" id="ps4">Finding Repair Shops</span>
+    </div>
+</div>
+
+<script>
+// Show processing overlay on analyze form submit
+document.addEventListener('DOMContentLoaded', function(){
+    var form = document.getElementById('mainForm');
+    if(form){
+        form.addEventListener('submit', function(e){
+            // Only show if form is valid
+            var fileInput = document.getElementById('fileInput');
+            if(!fileInput || !fileInput.files.length) return;
+            var overlay = document.getElementById('processing-overlay');
+            overlay.classList.add('active');
+            // Animate steps
+            var steps = ['ps1','ps2','ps3','ps4'];
+            var delays = [300, 1200, 2400, 3600];
+            steps.forEach(function(id, i){
+                setTimeout(function(){
+                    var el = document.getElementById(id);
+                    if(el) el.classList.add('done');
+                }, delays[i]);
+            });
+        });
+    }
+});
 </script>
 
 {% block extra_js %}{% endblock %}

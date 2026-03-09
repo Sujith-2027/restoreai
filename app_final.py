@@ -16,7 +16,6 @@ from datetime import datetime
 import json
 from io import BytesIO
 import urllib.parse
-import requests as req_lib
 import math
 import random
 import string
@@ -29,15 +28,6 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 app = Flask(__name__)
 app.secret_key = 'restoreai_secret_2026_fixed'
-
-@app.after_request
-def add_csp(response):
-    response.headers['Content-Security-Policy'] = "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;"
-    return response
-
-# ── TomTom API (free, no credit card) – https://developer.tomtom.com ────────
-import os
-TOMTOM_API_KEY = os.environ.get("TOMTOM_API_KEY", "YOUR_TOMTOM_API_KEY")
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg'}
@@ -73,62 +63,6 @@ LOCATIONS_WITH_COORDS = {
     }
 }
 
-import sqlite3, json as _json
-
-DB_PATH = os.path.join(os.path.dirname(__file__), 'restoreai.db')
-
-def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-def init_db():
-    conn = get_db()
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS reports (
-            id TEXT PRIMARY KEY,
-            data TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            data TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-init_db()
-
-def save_report(report_id, data):
-    conn = get_db()
-    conn.execute("INSERT OR REPLACE INTO reports (id, data) VALUES (?, ?)",
-                 (report_id, _json.dumps(data)))
-    conn.commit()
-    conn.close()
-
-def get_report(report_id):
-    conn = get_db()
-    row = conn.execute("SELECT data FROM reports WHERE id=?", (report_id,)).fetchone()
-    conn.close()
-    return _json.loads(row['data']) if row else None
-
-def save_history(entry):
-    conn = get_db()
-    conn.execute("INSERT INTO history (data) VALUES (?)", (_json.dumps(entry),))
-    conn.commit()
-    conn.close()
-
-def get_history(limit=100):
-    conn = get_db()
-    rows = conn.execute("SELECT data FROM history ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
-    conn.close()
-    return [_json.loads(r['data']) for r in rows]
-
-# Keep in-memory for backward compat
 report_storage = {}
 analysis_history = []
 model = None
@@ -175,24 +109,38 @@ def preprocess_image(path):
     return np.expand_dims(np.array(img) / 255.0, axis=0)
 
 def calculate_damage_analysis(confidence, device_age):
-    base_damage = max(0, (100 - confidence) * 0.8)
-    age_factor = min(device_age / 8.0, 1.0)
-    cracks = min(base_damage * 0.5 + age_factor * 25, 100)
-    rust = min(base_damage * 0.3 + age_factor * 35, 100)
-    broken = min(base_damage * 0.6 + age_factor * 20, 100)
-    overall_damage = (cracks + rust + broken) / 3
-    age_impact = age_factor * 100
-    
-    if overall_damage < 25:
-        repairability, repairability_class, repairability_icon, status_color = "Repairable", "repairable", "✅", "#0a4d0a"
-    elif overall_damage < 55:
-        repairability, repairability_class, repairability_icon, status_color = "Mostly Repairable", "mostly", "⚠️", "#d4af37"
+    # Low confidence = model struggled to recognize device = likely heavily damaged/unusual appearance
+    # High confidence = clear recognizable device = mostly normal, damage from age
+    uncertainty = max(0, (100 - confidence))  # 0-100, higher = more damaged looking
+    age_factor  = min(device_age / 10.0, 1.0)
+
+    cracks  = min(uncertainty * 0.65 + age_factor * 20, 100)
+    rust    = min(uncertainty * 0.40 + age_factor * 30, 100)
+    broken  = min(uncertainty * 0.75 + age_factor * 15, 100)
+
+    overall_damage = round((cracks + rust + broken) / 3, 1)
+    age_impact     = round(age_factor * 100, 1)
+
+    # <30 = repairable, 30-65 = mostly repairable, >65 = not repairable / recycle
+    if overall_damage < 30:
+        repairability      = "Repairable"
+        repairability_class = "repairable"
+        repairability_icon = "✅"
+        status_color       = "#0a4d0a"
+    elif overall_damage < 65:
+        repairability      = "Mostly Repairable"
+        repairability_class = "mostly"
+        repairability_icon = "⚠️"
+        status_color       = "#d4af37"
     else:
-        repairability, repairability_class, repairability_icon, status_color = "Not Repairable", "not", "❌", "#8b0000"
-    
+        repairability      = "Not Repairable"
+        repairability_class = "not"
+        repairability_icon = "❌"
+        status_color       = "#8b0000"
+
     return {
         "cracks": round(cracks, 1), "rust": round(rust, 1), "broken": round(broken, 1),
-        "overall": round(overall_damage, 1), "age_impact": round(age_impact, 1),
+        "overall": overall_damage, "age_impact": age_impact,
         "repairability": repairability, "repairability_class": repairability_class,
         "repairability_icon": repairability_icon, "status_color": status_color
     }
@@ -214,60 +162,68 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 
 def get_nearby_places(city, user_lat, user_lon, device_name, repairability):
     city = city.strip().title()
-    location_key = "recycle" if repairability == "Not Repairable" else "repair"
+    location_key  = "recycle" if repairability == "Not Repairable" else "repair"
     location_type = "Recycling Centers" if location_key == "recycle" else "Repair Shops"
-    keyword = "e-waste recycling" if location_key == "recycle" else "electronics repair shop"
+    icon          = "♻️" if location_key == "recycle" else "🔧"
+
+    # Multiple keywords tried in order until results found
+    keywords = (
+        ["e-waste recycling center", "scrap dealer electronics", "e-waste disposal"]
+        if location_key == "recycle"
+        else ["mobile phone repair", "laptop repair shop", "electronics repair center"]
+    )
     view_all_url = (
         f"https://www.google.com/maps/search/"
-        f"{urllib.parse.quote(keyword + ' near me')}/@{user_lat},{user_lon},14z"
+        f"{urllib.parse.quote(keywords[0] + ' near me')}/@{user_lat},{user_lon},14z"
     )
 
     # ── TomTom Search API ────────────────────────────────────────────────────
-    try:
-        url = (
-            f"https://api.tomtom.com/search/2/search/"
-            f"{urllib.parse.quote(keyword)}.json"
-            f"?key={TOMTOM_API_KEY}"
-            f"&lat={user_lat}&lon={user_lon}"
-            f"&radius=5000&limit=10&countrySet=IN"
-        )
-        r = req_lib.get(url, timeout=10)
-        r.raise_for_status()
-        results = r.json().get("results", [])
+    results = []
+    for kw in keywords:
+        try:
+            url = (
+                f"https://api.tomtom.com/search/2/search/"
+                f"{urllib.parse.quote(kw)}.json"
+                f"?key={TOMTOM_API_KEY}"
+                f"&lat={user_lat}&lon={user_lon}"
+                f"&radius=5000&limit=10&countrySet=IN"
+            )
+            r = req_lib.get(url, timeout=10)
+            r.raise_for_status()
+            results = r.json().get("results", [])
+            if results:
+                print(f"✅ TomTom: {len(results)} results for '{kw}'")
+                break
+        except Exception as e:
+            print(f"⚠️ TomTom error for '{kw}': {e}")
 
-        if results:
-            places = []
-            for item in results[:3]:
-                pos      = item.get("position", {})
-                addr     = item.get("address", {})
-                dist_m   = item.get("dist", 0)
-                dist_str = f"{int(dist_m)} m" if dist_m < 1000 else f"{dist_m/1000:.1f} km"
-                lat      = pos.get("lat", user_lat)
-                lon      = pos.get("lon", user_lon)
-                name     = item.get("poi", {}).get("name", "Repair Shop")
-                address  = addr.get("freeformAddress", city)
-                places.append({
-                    "icon"    : "🔧" if location_key == "repair" else "♻️",
-                    "name"    : name,
-                    "address" : address,
-                    "distance": dist_str,
-                    "rating"  : "N/A",
-                    "reviews" : 0,
-                    "maps_url": f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}",
-                    "lat": lat, "lon": lon
-                })
-            print(f"✅ TomTom found {len(places)} shops near {user_lat},{user_lon}")
-            return location_type, places, view_all_url
-
-    except Exception as e:
-        print(f"⚠️ TomTom error: {e}")
+    if results:
+        places = []
+        for item in results[:3]:
+            pos      = item.get("position", {})
+            addr     = item.get("address", {})
+            dist_m   = item.get("dist", 0)
+            dist_str = f"{int(dist_m)} m" if dist_m < 1000 else f"{dist_m/1000:.1f} km"
+            lat      = pos.get("lat", user_lat)
+            lon      = pos.get("lon", user_lon)
+            places.append({
+                "icon"    : icon,
+                "name"    : item.get("poi", {}).get("name", "Repair Shop"),
+                "address" : addr.get("freeformAddress", city),
+                "distance": dist_str,
+                "rating"  : "N/A",
+                "reviews" : 0,
+                "maps_url": f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}",
+                "lat": lat, "lon": lon
+            })
+        return location_type, places, view_all_url
 
     # ── Fallback: Overpass OSM ───────────────────────────────────────────────
     try:
         q = f"""[out:json][timeout:10];
         (node["shop"="repair"](around:5000,{user_lat},{user_lon});
-         node["shop"="electronics"](around:5000,{user_lat},{user_lon});
-         node["craft"="electronics_repair"](around:5000,{user_lat},{user_lon}););
+         node["craft"="electronics_repair"](around:5000,{user_lat},{user_lon});
+         node["shop"="electronics"](around:5000,{user_lat},{user_lon}););
         out body;"""
         r2 = req_lib.post("https://overpass-api.de/api/interpreter", data=q, timeout=12)
         elements = [e for e in r2.json().get("elements", []) if e.get("tags", {}).get("name")]
@@ -279,7 +235,7 @@ def get_nearby_places(city, user_lat, user_lon, device_name, repairability):
                 ds = f"{int(d*1000)} m" if d < 1 else f"{d:.1f} km"
                 t  = el.get("tags", {})
                 places.append({
-                    "icon": "🔧", "name": t.get("name", "Repair Shop"),
+                    "icon": icon, "name": t.get("name", "Repair Shop"),
                     "address": t.get("addr:full") or t.get("addr:street") or city,
                     "distance": ds, "rating": "N/A", "reviews": 0,
                     "maps_url": f"https://www.google.com/maps/dir/?api=1&destination={el['lat']},{el['lon']}",
@@ -293,13 +249,14 @@ def get_nearby_places(city, user_lat, user_lon, device_name, repairability):
     # ── Last resort: offset pins near user ───────────────────────────────────
     offsets = [(0.004, 0.003), (-0.003, 0.005), (0.005, -0.004)]
     places  = []
+    label   = "Recycling Center" if location_key == "recycle" else "Repair Shop"
     for i, (dlat, dlon) in enumerate(offsets):
         lat2, lon2 = user_lat + dlat, user_lon + dlon
         d = calculate_distance(user_lat, user_lon, lat2, lon2)
         places.append({
-            "icon": "🔧", "name": f"Repair Shop {i+1}", "address": city,
+            "icon": icon, "name": f"{label} {i+1}", "address": city,
             "distance": f"{d:.1f} km", "rating": "N/A", "reviews": 0,
-            "maps_url": f"https://www.google.com/maps/search/repair+shop/@{lat2},{lon2},16z",
+            "maps_url": f"https://www.google.com/maps/search/{urllib.parse.quote(label)}/@{lat2},{lon2},16z",
             "lat": lat2, "lon": lon2
         })
     return location_type, places, view_all_url
@@ -327,10 +284,9 @@ def analyze():
             device_age = int(request.form.get('device_age', 0))
             raw_city   = request.form.get('city', '').strip()
             area       = request.form.get('area', '').strip()
-            latitude   = request.form.get('latitude',  '').strip()
+            latitude   = request.form.get('latitude', '').strip()
             longitude  = request.form.get('longitude', '').strip()
 
-            # Normalize city name
             city_map = {
                 'greater mumbai': 'Mumbai', 'mumbai suburban': 'Mumbai',
                 'mumbai city': 'Mumbai', 'new delhi': 'Delhi',
@@ -338,15 +294,15 @@ def analyze():
                 'hyderabad': 'Hyderabad', 'pune': 'Pune',
             }
             city = city_map.get(raw_city.lower(), raw_city.title()) if raw_city else 'Mumbai'
-            print(f"📍 city={city!r} area={area!r} lat={latitude!r} lon={longitude!r}")
-            
+            print(f"city={city!r} area={area!r} lat={latitude!r} lon={longitude!r}")
+
             user_lat, user_lon = None, None
             if latitude and longitude:
                 try:
                     user_lat, user_lon = float(latitude), float(longitude)
                 except:
                     pass
-            
+
             if not user_lat:
                 city_coords = {
                     "Mumbai": (19.0760, 72.8777), "Delhi": (28.7041, 77.1025),
@@ -355,10 +311,10 @@ def analyze():
                     "Kolkata": (22.5726, 88.3639), "Ahmedabad": (23.0225, 72.5714)
                 }
                 user_lat, user_lon = city_coords.get(city, (19.0760, 72.8777))
-                print(f"⚠️  No GPS received – using city fallback: {city} → {user_lat},{user_lon}")
+                print(f"No GPS - using city fallback: {city}")
             else:
-                print(f"✅ GPS received: {user_lat},{user_lon}")
-            
+                print(f"GPS received: {user_lat},{user_lon}")
+
             model = load_model()
             img_array = preprocess_image(filepath)
             predictions = model.predict(img_array, verbose=0)[0]
@@ -368,37 +324,27 @@ def analyze():
             confidence = float(predictions[pred_idx]) * 100
             device_key = class_names[pred_idx]
 
-            # ── Smart correction: use image aspect ratio to fix TV vs Fridge confusion
-            # TVs are wide (landscape), Fridges are tall (portrait)
+            # Aspect ratio correction: TV=landscape, Fridge=portrait
             raw_img = Image.open(filepath)
             img_w, img_h = raw_img.size
-            aspect = img_w / img_h  # >1 = landscape, <1 = portrait
-
-            # If model says Fridge but image is landscape → likely a TV
+            aspect = img_w / img_h
             if device_key == "Fridge" and aspect > 1.2:
                 tv_idx = class_names.index("Television")
-                device_key = "Television"
-                pred_idx = tv_idx
+                device_key = "Television"; pred_idx = tv_idx
                 confidence = max(confidence, float(predictions[tv_idx]) * 100)
-                print(f"⚠️ Corrected Fridge→Television based on aspect ratio {aspect:.2f}")
-
-            # If model says TV but image is portrait → check if fridge is more likely
+                print(f"Corrected Fridge->TV aspect={aspect:.2f}")
             elif device_key == "Television" and aspect < 0.7:
                 fridge_idx = class_names.index("Fridge")
                 if predictions[fridge_idx] > 0.2:
-                    device_key = "Fridge"
-                    pred_idx = fridge_idx
+                    device_key = "Fridge"; pred_idx = fridge_idx
                     confidence = float(predictions[fridge_idx]) * 100
-                    print(f"⚠️ Corrected Television→Fridge based on aspect ratio {aspect:.2f}")
-
-            # If model says AC but image is squarish/portrait → likely Washing Machine
+                    print(f"Corrected TV->Fridge aspect={aspect:.2f}")
             elif device_key == "Air_Conditioner" and aspect < 1.0:
                 wm_idx = class_names.index("Washing_machine")
                 if predictions[wm_idx] > 0.15:
-                    device_key = "Washing_machine"
-                    pred_idx = wm_idx
+                    device_key = "Washing_machine"; pred_idx = wm_idx
                     confidence = float(predictions[wm_idx]) * 100
-                    print(f"⚠️ Corrected AC→WashingMachine based on aspect ratio {aspect:.2f}")
+                    print(f"Corrected AC->WashingMachine aspect={aspect:.2f}")
 
             info = DEVICE_INFO[device_key]
             
@@ -407,7 +353,7 @@ def analyze():
             location_type, nearby_places, view_all_url = get_nearby_places(city, user_lat, user_lon, info['display_name'], damage_analysis['repairability'])
             receipt_number = generate_receipt_number()
             
-            _report_data = {
+            report_storage[receipt_number] = {
                 'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 'device': info['display_name'], 'confidence': round(confidence, 2),
                 'device_age': device_age, 'repairability': damage_analysis['repairability'],
@@ -417,10 +363,8 @@ def analyze():
                 'show_rust': info['show_rust'], 'nearby_places': nearby_places,
                 'location': f"{area} {city}".strip() if area else city, 'status_color': damage_analysis['status_color']
             }
-            report_storage[receipt_number] = _report_data
-            save_report(receipt_number, _report_data)
             
-            _hist_entry = {
+            analysis_history.append({
                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "device": info['display_name'], "confidence": round(confidence, 2),
                 "repairability": damage_analysis['repairability'],
@@ -428,10 +372,8 @@ def analyze():
                 "damage": damage_analysis['overall'], "age": device_age,
                 "location": city, "cracks": damage_analysis['cracks'],
                 "rust": damage_analysis['rust'], "broken": damage_analysis['broken']
-            }
+            })
             
-            save_history(_hist_entry)
-            analysis_history.append(_hist_entry)
             if len(analysis_history) > 100:
                 analysis_history.pop(0)
             
@@ -456,34 +398,6 @@ def analyze():
             traceback.print_exc()
             return f"Error: {str(e)}", 500
     return render_template('analyze.html', page='analyze')
-
-@app.route('/gps-fix')
-def gps_fix():
-    """Returns a JS snippet - inject into analyze.html to capture GPS"""
-    from flask import Response
-    js = """
-    document.addEventListener('DOMContentLoaded', function() {
-        // Auto-get GPS when page loads
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(function(pos) {
-                var lat = pos.coords.latitude.toFixed(6);
-                var lon = pos.coords.longitude.toFixed(6);
-                var latField = document.getElementById('latitude') || document.querySelector('[name=latitude]');
-                var lonField = document.getElementById('longitude') || document.querySelector('[name=longitude]');
-                var statusEl = document.getElementById('gps-status');
-                if (latField) latField.value = lat;
-                if (lonField) lonField.value = lon;
-                if (statusEl) statusEl.innerHTML = '✅ Location detected: ' + lat + ', ' + lon;
-                console.log('GPS captured:', lat, lon);
-            }, function(err) {
-                console.log('GPS error:', err.message);
-                var statusEl = document.getElementById('gps-status');
-                if (statusEl) statusEl.innerHTML = '⚠️ GPS unavailable - using city center';
-            }, { enableHighAccuracy: true, timeout: 8000 });
-        }
-    });
-    """
-    return Response(js, content_type="application/javascript")
 
 @app.route('/analytics')
 def analytics():
@@ -583,10 +497,10 @@ def model_report():
         class_accuracy=class_accuracy, confusion_matrix=confusion_matrix, class_names=class_names)
 
 @app.route('/get-report', methods=['GET', 'POST'])
-def get_report_page():
+def get_report():
     if request.method == 'POST':
         receipt = request.form.get('receipt_number', '').strip().upper()
-        if receipt in report_storage or get_report(receipt):
+        if receipt in report_storage:
             return redirect(url_for('download_report', report_id=receipt))
         else:
             flash('Receipt number not found', 'error')
@@ -594,10 +508,6 @@ def get_report_page():
 
 @app.route('/download-report/<report_id>')
 def download_report(report_id):
-    if report_id not in report_storage:
-        db_report = get_report(report_id)
-        if db_report:
-            report_storage[report_id] = db_report
     if report_id not in report_storage:
         return "Report not found", 404
     
@@ -727,65 +637,6 @@ def download_report(report_id):
     doc.build(story)
     buffer.seek(0)
     return send_file(buffer, as_attachment=True, download_name=f'ReStoreAI_Report_{report_id}.pdf', mimetype='application/pdf')
-
-@app.route('/overpass', methods=['POST'])
-def overpass_proxy():
-    from flask import Response, request as freq
-    try:
-        r = req_lib.post("https://overpass-api.de/api/interpreter",
-                         data=freq.get_data(), timeout=15)
-        return Response(r.content, content_type="application/json",
-                        headers={"Access-Control-Allow-Origin": "*"})
-    except:
-        return {"elements": []}, 200
-
-@app.route('/tiles/<int:z>/<int:x>/<int:y>.png')
-def tile_proxy(z, x, y):
-    """Fallback raster tiles via Flask"""
-    from flask import Response
-    for url in [
-        f"https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-        f"https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-        f"https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-    ]:
-        try:
-            r = req_lib.get(url, timeout=8, headers={"User-Agent": "Mozilla/5.0"})
-            if r.status_code == 200:
-                return Response(r.content, content_type="image/png",
-                                headers={"Cache-Control": "public, max-age=86400"})
-        except: continue
-    import base64
-    blank = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
-    return Response(blank, content_type="image/png")
-
-@app.route('/tomtom-tiles/<style>/<layer>/<int:z>/<int:x>/<int:y>.<fmt>')
-def tomtom_tile_proxy(style, layer, z, x, y, fmt):
-    """TomTom vector map tiles proxied through Flask"""
-    from flask import Response
-    ct = "image/jpeg" if fmt == "jpg" else "image/png"
-    if style == "sat":
-        url = f"https://api.tomtom.com/map/1/tile/sat/main/{z}/{x}/{y}.jpg?key={TOMTOM_API_KEY}"
-    else:
-        url = f"https://api.tomtom.com/map/1/tile/basic/{layer}/{z}/{x}/{y}.png?key={TOMTOM_API_KEY}&tileSize=256"
-    try:
-        r = req_lib.get(url, timeout=8, headers={"User-Agent": "Mozilla/5.0"})
-        if r.status_code == 200:
-            return Response(r.content, content_type=ct,
-                            headers={"Cache-Control": "public, max-age=86400"})
-    except Exception as e:
-        print(f"TomTom tile error: {e}")
-    # Fallback to CartoDB dark
-    try:
-        fb = req_lib.get(f"https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-                         timeout=6, headers={"User-Agent": "Mozilla/5.0"})
-        if fb.status_code == 200:
-            return Response(fb.content, content_type="image/png",
-                            headers={"Cache-Control": "public, max-age=3600"})
-    except: pass
-    import base64
-    blank = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
-    return Response(blank, content_type="image/png")
-
 
 if __name__ == '__main__':
     print("="*80)

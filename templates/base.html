@@ -29,102 +29,9 @@ body.light-mode{
     --bg:#f8fafc;
     --card:#ffffff;
     --text:#0f172a;
-    --muted:#334155;
+    --muted:#475569;
     --accent:#16a34a;
     --nav:#ffffff;
-}
-
-/* Light mode text overrides */
-body.light-mode h1,
-body.light-mode h2,
-body.light-mode h3,
-body.light-mode h4,
-body.light-mode h5,
-body.light-mode h6 {
-    color:#0f172a !important;
-    -webkit-text-fill-color:#0f172a !important;
-    background:none !important;
-}
-
-body.light-mode p,
-body.light-mode label,
-body.light-mode span:not(.btn):not(.nav-links a),
-body.light-mode li,
-body.light-mode td,
-body.light-mode th {
-    color:#334155 !important;
-}
-
-body.light-mode .stat-number {
-    color:var(--accent) !important;
-    -webkit-text-fill-color:var(--accent) !important;
-}
-
-body.light-mode input,
-body.light-mode select,
-body.light-mode textarea {
-    color:#0f172a !important;
-    background:#f1f5f9 !important;
-    border-color:#cbd5e1 !important;
-}
-
-body.light-mode .card,
-body.light-mode .option-card,
-body.light-mode .about-section,
-body.light-mode .section-card {
-    border-color:#e2e8f0 !important;
-}
-
-body.light-mode .upload-area {
-    background:#f0fdf4 !important;
-    border-color:#16a34a !important;
-}
-
-body.light-mode .upload-area h3,
-body.light-mode .upload-area p {
-    color:#0f172a !important;
-}
-
-body.light-mode nav {
-    border-bottom-color:#e2e8f0 !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-}
-
-body.light-mode .nav-links a {
-    color:#475569 !important;
-}
-
-body.light-mode .nav-links a:hover {
-    background:#f1f5f9 !important;
-    color:#0f172a !important;
-}
-
-body.light-mode .footer {
-    border-top-color:#e2e8f0 !important;
-}
-
-body.light-mode .footer p {
-    color:#64748b !important;
-}
-
-body.light-mode .gps-status {
-    color:#0f172a !important;
-}
-
-body.light-mode .info-box {
-    color:#16a34a !important;
-}
-
-body.light-mode .location-btn {
-    background:#f8fafc !important;
-    color:#0f172a !important;
-    border-color:#cbd5e1 !important;
-}
-
-body.light-mode .location-btn:hover,
-body.light-mode .location-btn.active {
-    border-color:#16a34a !important;
-    color:#16a34a !important;
 }
 
 *{
@@ -285,6 +192,104 @@ button:hover,.btn:hover{
     border-top:1px solid #334155;
 }
 
+
+/* ===== LIGHT MODE TEXT OVERRIDES ===== */
+body.light-mode h1,
+body.light-mode h2,
+body.light-mode h3,
+body.light-mode h4,
+body.light-mode h5,
+body.light-mode h6 {
+    color:#0f172a !important;
+    -webkit-text-fill-color:#0f172a !important;
+    background:none !important;
+}
+
+body.light-mode p,
+body.light-mode label,
+body.light-mode li,
+body.light-mode td,
+body.light-mode th {
+    color:#334155 !important;
+}
+
+body.light-mode .muted,
+body.light-mode [class*="muted"] {
+    color:#475569 !important;
+}
+
+body.light-mode .stat-number {
+    color:#16a34a !important;
+    -webkit-text-fill-color:#16a34a !important;
+}
+
+body.light-mode input,
+body.light-mode select,
+body.light-mode textarea {
+    color:#0f172a !important;
+    background:#f1f5f9 !important;
+    border-color:#cbd5e1 !important;
+}
+
+body.light-mode .card,
+body.light-mode .option-card,
+body.light-mode .about-section,
+body.light-mode .section-card {
+    border-color:#e2e8f0 !important;
+}
+
+body.light-mode .upload-area {
+    background:#f0fdf4 !important;
+    border-color:#16a34a !important;
+}
+
+body.light-mode .upload-area h3,
+body.light-mode .upload-area p {
+    color:#0f172a !important;
+}
+
+body.light-mode nav {
+    border-bottom-color:#e2e8f0 !important;
+    box-shadow:0 1px 3px rgba(0,0,0,0.08);
+}
+
+body.light-mode .nav-links a {
+    color:#475569 !important;
+}
+
+body.light-mode .nav-links a:hover {
+    background:#f1f5f9 !important;
+    color:#0f172a !important;
+}
+
+body.light-mode .footer p {
+    color:#64748b !important;
+}
+
+body.light-mode .location-btn {
+    background:#f8fafc !important;
+    color:#0f172a !important;
+    border-color:#cbd5e1 !important;
+}
+
+body.light-mode .location-btn.active {
+    border-color:#16a34a !important;
+    color:#16a34a !important;
+}
+
+body.light-mode .info-box {
+    color:#16a34a !important;
+    background:rgba(22,163,74,0.08) !important;
+}
+
+body.light-mode .gps-ok { color:#16a34a !important; }
+body.light-mode .gps-warn { color:#b45309 !important; }
+body.light-mode .gps-err { color:#dc2626 !important; }
+
+/* Also fix --muted variable usage in light mode */
+body.light-mode { --muted: #475569; }
+
+
 {% block extra_css %}{% endblock %}
 
 /* Processing overlay */
@@ -352,7 +357,7 @@ button:hover,.btn:hover{
 <a href="/analyze" {% if page == 'analyze' %}class="active"{% endif %}>Analyze</a>
 <a href="/report" {% if page == 'report' %}class="active"{% endif %}>Report</a>
 
-<button class="theme-toggle" onclick="toggleTheme()">🌙 Theme</button>
+<button class="theme-toggle" id="themeBtn" onclick="toggleTheme()">☀️ Light</button>
 </div>
 </div>
 </nav>
@@ -370,16 +375,18 @@ button:hover,.btn:hover{
 function toggleTheme(){
     var isLight = document.body.classList.toggle("light-mode");
     localStorage.setItem('theme', isLight ? 'light' : 'dark');
-    var btn = document.querySelector('.theme-toggle');
-    if(btn) btn.textContent = isLight ? 'Dark' : 'Light';
+    var btn = document.getElementById('themeBtn');
+    if(btn) btn.textContent = isLight ? '🌙 Dark' : '☀️ Light';
 }
 
 // Apply saved theme on load
 document.addEventListener('DOMContentLoaded', function(){
+    var btn = document.getElementById('themeBtn');
     if(localStorage.getItem('theme') === 'light'){
         document.body.classList.add('light-mode');
-        var btn = document.querySelector('.theme-toggle');
-        if(btn) btn.textContent = 'Dark';
+        if(btn) btn.textContent = '🌙 Dark';
+    } else {
+        if(btn) btn.textContent = '☀️ Light';
     }
 });
 </script>

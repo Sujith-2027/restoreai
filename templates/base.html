@@ -4,18 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}ReStoreAI{% endblock %}</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f172a'/><text y='72' x='50' text-anchor='middle' font-size='60' font-family='Arial'>&#128295;</text></svg>">
+
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<script>
-// Apply saved theme BEFORE page renders to avoid flash
-(function(){
-    if(localStorage.getItem('theme') === 'light'){
-        document.documentElement.classList.add('light-mode-pre');
-    }
-})();
-</script>
 
 <style>
+
 :root{
     --bg:#0f172a;
     --card:#1e293b;
@@ -49,6 +42,7 @@ body{
 }
 
 /* NAVBAR */
+
 nav{
     background:var(--nav);
     padding:18px 0;
@@ -76,7 +70,6 @@ nav{
 .logo h2{
     font-weight:700;
     font-size:22px;
-    color:var(--text);
 }
 
 .nav-links{
@@ -91,12 +84,10 @@ nav{
     font-size:14px;
     padding:8px 16px;
     border-radius:8px;
-    transition:0.3s;
 }
 
 .nav-links a:hover{
     background:var(--card);
-    color:var(--text);
 }
 
 .nav-links a.active{
@@ -104,7 +95,8 @@ nav{
     color:white;
 }
 
-/* THEME TOGGLE */
+/* THEME BUTTON */
+
 .theme-toggle{
     margin-left:15px;
     cursor:pointer;
@@ -112,10 +104,10 @@ nav{
     border-radius:20px;
     border:1px solid var(--accent);
     color:var(--accent);
-    font-size:13px;
 }
 
-/* CONTAINER */
+/* MAIN CONTAINER */
+
 .container{
     max-width:1200px;
     margin:50px auto;
@@ -123,66 +115,27 @@ nav{
 }
 
 /* CARD */
+
 .card{
     background:var(--card);
     padding:40px;
     border-radius:20px;
     border:1px solid #334155;
-    animation:fadeIn 0.5s ease-in;
-}
-
-@keyframes fadeIn{
-    from{opacity:0; transform:translateY(20px);}
-    to{opacity:1; transform:translateY(0);}
-}
-
-/* TYPOGRAPHY */
-h1{
-    font-size:36px;
-    font-weight:800;
-    margin-bottom:20px;
-    text-align:center;
-    background:linear-gradient(90deg,var(--accent),#38bdf8);
-    -webkit-background-clip:text;
-    -webkit-text-fill-color:transparent;
-}
-
-h2{
-    font-size:28px;
-    margin-bottom:20px;
-}
-
-h3{
-    font-size:20px;
-    margin:20px 0;
-}
-
-p{
-    color:var(--muted);
-    font-size:15px;
-    line-height:1.6;
 }
 
 /* BUTTON */
+
 button,.btn{
     padding:12px 28px;
-    background:linear-gradient(90deg,var(--accent),#16a34a);
+    background:var(--accent);
     color:white;
     border:none;
     border-radius:8px;
     cursor:pointer;
-    font-weight:600;
-    transition:0.3s;
-    text-decoration:none;
-    display:inline-block;
-}
-
-button:hover,.btn:hover{
-    transform:translateY(-3px);
-    box-shadow:0 10px 20px rgba(34,197,94,0.3);
 }
 
 /* FOOTER */
+
 .footer{
     text-align:center;
     color:var(--muted);
@@ -192,174 +145,80 @@ button:hover,.btn:hover{
     border-top:1px solid #334155;
 }
 
+/* PROCESSING OVERLAY */
 
-/* ===== LIGHT MODE TEXT OVERRIDES ===== */
-body.light-mode h1,
-body.light-mode h2,
-body.light-mode h3,
-body.light-mode h4,
-body.light-mode h5,
-body.light-mode h6 {
-    color:#0f172a !important;
-    -webkit-text-fill-color:#0f172a !important;
-    background:none !important;
-}
-
-body.light-mode p,
-body.light-mode label,
-body.light-mode li,
-body.light-mode td,
-body.light-mode th {
-    color:#334155 !important;
-}
-
-body.light-mode .muted,
-body.light-mode [class*="muted"] {
-    color:#475569 !important;
-}
-
-body.light-mode .stat-number {
-    color:#16a34a !important;
-    -webkit-text-fill-color:#16a34a !important;
-}
-
-body.light-mode input,
-body.light-mode select,
-body.light-mode textarea {
-    color:#0f172a !important;
-    background:#f1f5f9 !important;
-    border-color:#cbd5e1 !important;
-}
-
-body.light-mode .card,
-body.light-mode .option-card,
-body.light-mode .about-section,
-body.light-mode .section-card {
-    border-color:#e2e8f0 !important;
-}
-
-body.light-mode .upload-area {
-    background:#f0fdf4 !important;
-    border-color:#16a34a !important;
-}
-
-body.light-mode .upload-area h3,
-body.light-mode .upload-area p {
-    color:#0f172a !important;
-}
-
-body.light-mode nav {
-    border-bottom-color:#e2e8f0 !important;
-    box-shadow:0 1px 3px rgba(0,0,0,0.08);
-}
-
-body.light-mode .nav-links a {
-    color:#475569 !important;
-}
-
-body.light-mode .nav-links a:hover {
-    background:#f1f5f9 !important;
-    color:#0f172a !important;
-}
-
-body.light-mode .footer p {
-    color:#64748b !important;
-}
-
-body.light-mode .location-btn {
-    background:#f8fafc !important;
-    color:#0f172a !important;
-    border-color:#cbd5e1 !important;
-}
-
-body.light-mode .location-btn.active {
-    border-color:#16a34a !important;
-    color:#16a34a !important;
-}
-
-body.light-mode .info-box {
-    color:#16a34a !important;
-    background:rgba(22,163,74,0.08) !important;
-}
-
-body.light-mode .gps-ok { color:#16a34a !important; }
-body.light-mode .gps-warn { color:#b45309 !important; }
-body.light-mode .gps-err { color:#dc2626 !important; }
-
-/* Also fix --muted variable usage in light mode */
-body.light-mode { --muted: #475569; }
-
-
-{% block extra_css %}{% endblock %}
-
-/* Processing overlay */
 #processing-overlay{
     display:none;
     position:fixed;
-    top:0; left:0; width:100%; height:100%;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
     background:rgba(15,23,42,0.95);
     z-index:9999;
     flex-direction:column;
     align-items:center;
     justify-content:center;
-    text-align:center;
 }
-#processing-overlay.active{ display:flex; }
+
+#processing-overlay.active{
+    display:flex;
+}
+
 .proc-spinner{
-    width:70px; height:70px;
+    width:70px;
+    height:70px;
     border:5px solid #1e293b;
     border-top:5px solid #22c55e;
     border-radius:50%;
     animation:spin 1s linear infinite;
     margin-bottom:30px;
 }
-@keyframes spin{ to{ transform:rotate(360deg); } }
-.proc-title{
-    font-size:24px; font-weight:700;
-    color:#e2e8f0; margin-bottom:12px;
+
+@keyframes spin{
+    to{ transform:rotate(360deg); }
 }
+
+.proc-title{
+    font-size:24px;
+    font-weight:700;
+    color:#e2e8f0;
+    margin-bottom:12px;
+}
+
 .proc-sub{
-    font-size:15px; color:#94a3b8;
+    font-size:15px;
+    color:#94a3b8;
     margin-bottom:30px;
 }
-.proc-steps{
-    display:flex; gap:12px;
-    flex-wrap:wrap; justify-content:center;
-}
-.proc-step{
-    padding:8px 18px;
-    border-radius:20px;
-    background:#1e293b;
-    color:#94a3b8;
-    font-size:13px;
-    border:1px solid #334155;
-    transition:0.5s;
-}
-.proc-step.done{
-    background:rgba(34,197,94,0.15);
-    color:#22c55e;
-    border-color:#22c55e;
-}
+
 </style>
+
+{% block extra_css %}{% endblock %}
+
 </head>
 
 <body>
 
 <nav>
+
 <div class="nav-container">
+
 <div class="logo">
 <span>🔧</span>
 <h2>ReStoreAI</h2>
 </div>
 
 <div class="nav-links">
-<a href="/" {% if page == 'home' %}class="active"{% endif %}>Home</a>
-<a href="/analyze" {% if page == 'analyze' %}class="active"{% endif %}>Analyze</a>
-<a href="/report" {% if page == 'report' %}class="active"{% endif %}>Report</a>
+<a href="/" {% if page=='home' %}class="active"{% endif %}>Home</a>
+<a href="/analyze" {% if page=='analyze' %}class="active"{% endif %}>Analyze</a>
+<a href="/report" {% if page=='report' %}class="active"{% endif %}>Report</a>
 
-<button class="theme-toggle" id="themeBtn" onclick="toggleTheme()">☀️ Light</button>
+<button class="theme-toggle" onclick="toggleTheme()">Theme</button>
 </div>
+
 </div>
+
 </nav>
 
 <div class="container">
@@ -368,65 +227,20 @@ body.light-mode { --muted: #475569; }
 
 <div class="footer">
 <p>Powered by TensorFlow & MobileNetV2 | ReStoreAI © 2026</p>
-<p>AI-Based Device Classification & Repair Cost Estimation</p>
+</div>
+
+<div id="processing-overlay">
+<div class="proc-spinner"></div>
+<div class="proc-title">Analyzing Your Device...</div>
+<div class="proc-sub">AI processing your image</div>
 </div>
 
 <script>
+
 function toggleTheme(){
-    var isLight = document.body.classList.toggle("light-mode");
-    localStorage.setItem('theme', isLight ? 'light' : 'dark');
-    var btn = document.getElementById('themeBtn');
-    if(btn) btn.textContent = isLight ? '🌙 Dark' : '☀️ Light';
+document.body.classList.toggle("light-mode")
 }
 
-// Apply saved theme on load
-document.addEventListener('DOMContentLoaded', function(){
-    var btn = document.getElementById('themeBtn');
-    if(localStorage.getItem('theme') === 'light'){
-        document.body.classList.add('light-mode');
-        if(btn) btn.textContent = '🌙 Dark';
-    } else {
-        if(btn) btn.textContent = '☀️ Light';
-    }
-});
-</script>
-
-<!-- Processing overlay -->
-<div id="processing-overlay">
-    <div class="proc-spinner"></div>
-    <div class="proc-title">Analyzing Your Device...</div>
-    <div class="proc-sub">Our AI is processing your image</div>
-    <div class="proc-steps">
-        <span class="proc-step" id="ps1">Uploading Image</span>
-        <span class="proc-step" id="ps2">Running AI Model</span>
-        <span class="proc-step" id="ps3">Damage Analysis</span>
-        <span class="proc-step" id="ps4">Finding Repair Shops</span>
-    </div>
-</div>
-
-<script>
-// Show processing overlay on analyze form submit
-document.addEventListener('DOMContentLoaded', function(){
-    var form = document.getElementById('mainForm');
-    if(form){
-        form.addEventListener('submit', function(e){
-            // Only show if form is valid
-            var fileInput = document.getElementById('fileInput');
-            if(!fileInput || !fileInput.files.length) return;
-            var overlay = document.getElementById('processing-overlay');
-            overlay.classList.add('active');
-            // Animate steps
-            var steps = ['ps1','ps2','ps3','ps4'];
-            var delays = [300, 1200, 2400, 3600];
-            steps.forEach(function(id, i){
-                setTimeout(function(){
-                    var el = document.getElementById(id);
-                    if(el) el.classList.add('done');
-                }, delays[i]);
-            });
-        });
-    }
-});
 </script>
 
 {% block extra_js %}{% endblock %}

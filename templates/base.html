@@ -1,13 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>{% block title %}ReStoreAI{% endblock %}</title>
 
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
 <style>
+
+/* GLOBAL */
 
 :root{
     --bg:#0f172a;
@@ -38,7 +42,6 @@ body{
     background:var(--bg);
     color:var(--text);
     min-height:100vh;
-    transition:0.3s ease;
 }
 
 /* NAVBAR */
@@ -47,9 +50,6 @@ nav{
     background:var(--nav);
     padding:18px 0;
     border-bottom:1px solid #334155;
-    position:sticky;
-    top:0;
-    z-index:100;
 }
 
 .nav-container{
@@ -68,7 +68,6 @@ nav{
 }
 
 .logo h2{
-    font-weight:700;
     font-size:22px;
 }
 
@@ -79,8 +78,8 @@ nav{
 }
 
 .nav-links a{
-    color:var(--muted);
     text-decoration:none;
+    color:var(--muted);
     font-size:14px;
     padding:8px 16px;
     border-radius:8px;
@@ -98,12 +97,12 @@ nav{
 /* THEME BUTTON */
 
 .theme-toggle{
-    margin-left:15px;
-    cursor:pointer;
     padding:6px 12px;
     border-radius:20px;
     border:1px solid var(--accent);
     color:var(--accent);
+    background:transparent;
+    cursor:pointer;
 }
 
 /* MAIN CONTAINER */
@@ -123,15 +122,35 @@ nav{
     border:1px solid #334155;
 }
 
-/* BUTTON */
+/* BUTTONS */
 
-button,.btn{
+button,
+.btn{
     padding:12px 28px;
     background:var(--accent);
     color:white;
     border:none;
     border-radius:8px;
     cursor:pointer;
+    font-weight:600;
+    text-decoration:none;
+    display:inline-block;
+}
+
+button:hover,
+.btn:hover{
+    opacity:0.9;
+}
+
+body.light-mode button,
+body.light-mode .btn{
+    color:white !important;
+}
+
+/* REMOVE UNDERLINE */
+
+a{
+    text-decoration:none;
 }
 
 /* FOOTER */
@@ -141,7 +160,6 @@ button,.btn{
     color:var(--muted);
     padding:40px 20px;
     margin-top:60px;
-    font-size:13px;
     border-top:1px solid #334155;
 }
 
@@ -182,14 +200,11 @@ button,.btn{
 .proc-title{
     font-size:24px;
     font-weight:700;
-    color:#e2e8f0;
-    margin-bottom:12px;
+    margin-bottom:10px;
 }
 
 .proc-sub{
-    font-size:15px;
     color:#94a3b8;
-    margin-bottom:30px;
 }
 
 </style>
@@ -210,11 +225,13 @@ button,.btn{
 </div>
 
 <div class="nav-links">
+
 <a href="/" {% if page=='home' %}class="active"{% endif %}>Home</a>
 <a href="/analyze" {% if page=='analyze' %}class="active"{% endif %}>Analyze</a>
 <a href="/report" {% if page=='report' %}class="active"{% endif %}>Report</a>
 
 <button class="theme-toggle" onclick="toggleTheme()">Theme</button>
+
 </div>
 
 </div>
@@ -229,16 +246,22 @@ button,.btn{
 <p>Powered by TensorFlow & MobileNetV2 | ReStoreAI © 2026</p>
 </div>
 
+<!-- Processing overlay -->
+
 <div id="processing-overlay">
+
 <div class="proc-spinner"></div>
+
 <div class="proc-title">Analyzing Your Device...</div>
+
 <div class="proc-sub">AI processing your image</div>
+
 </div>
 
 <script>
 
 function toggleTheme(){
-document.body.classList.toggle("light-mode")
+    document.body.classList.toggle("light-mode")
 }
 
 </script>
@@ -246,4 +269,5 @@ document.body.classList.toggle("light-mode")
 {% block extra_js %}{% endblock %}
 
 </body>
+
 </html>

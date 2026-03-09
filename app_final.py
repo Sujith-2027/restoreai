@@ -73,6 +73,62 @@ LOCATIONS_WITH_COORDS = {
     }
 }
 
+import sqlite3, json as _json
+
+DB_PATH = os.path.join(os.path.dirname(__file__), 'restoreai.db')
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    conn = get_db()
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS reports (
+            id TEXT PRIMARY KEY,
+            data TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            data TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+init_db()
+
+def save_report(report_id, data):
+    conn = get_db()
+    conn.execute("INSERT OR REPLACE INTO reports (id, data) VALUES (?, ?)",
+                 (report_id, _json.dumps(data)))
+    conn.commit()
+    conn.close()
+
+def get_report(report_id):
+    conn = get_db()
+    row = conn.execute("SELECT data FROM reports WHERE id=?", (report_id,)).fetchone()
+    conn.close()
+    return _json.loads(row['data']) if row else None
+
+def save_history(entry):
+    conn = get_db()
+    conn.execute("INSERT INTO history (data) VALUES (?)", (_json.dumps(entry),))
+    conn.commit()
+    conn.close()
+
+def get_history(limit=100):
+    conn = get_db()
+    rows = conn.execute("SELECT data FROM history ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+    conn.close()
+    return [_json.loads(r['data']) for r in rows]
+
+# Keep in-memory for backward compat
 report_storage = {}
 analysis_history = []
 model = None
@@ -351,7 +407,7 @@ def analyze():
             location_type, nearby_places, view_all_url = get_nearby_places(city, user_lat, user_lon, info['display_name'], damage_analysis['repairability'])
             receipt_number = generate_receipt_number()
             
-            report_storage[receipt_number] = {
+            _report_data = {
                 'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 'device': info['display_name'], 'confidence': round(confidence, 2),
                 'device_age': device_age, 'repairability': damage_analysis['repairability'],
@@ -361,8 +417,10 @@ def analyze():
                 'show_rust': info['show_rust'], 'nearby_places': nearby_places,
                 'location': f"{area} {city}".strip() if area else city, 'status_color': damage_analysis['status_color']
             }
+            report_storage[receipt_number] = _report_data
+            save_report(receipt_number, _report_data)
             
-            analysis_history.append({
+            _hist_entry = {
                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "device": info['display_name'], "confidence": round(confidence, 2),
                 "repairability": damage_analysis['repairability'],
@@ -370,8 +428,10 @@ def analyze():
                 "damage": damage_analysis['overall'], "age": device_age,
                 "location": city, "cracks": damage_analysis['cracks'],
                 "rust": damage_analysis['rust'], "broken": damage_analysis['broken']
-            })
+            }
             
+            save_history(_hist_entry)
+            analysis_history.append(_hist_entry)
             if len(analysis_history) > 100:
                 analysis_history.pop(0)
             
@@ -523,10 +583,10 @@ def model_report():
         class_accuracy=class_accuracy, confusion_matrix=confusion_matrix, class_names=class_names)
 
 @app.route('/get-report', methods=['GET', 'POST'])
-def get_report():
+def get_report_page():
     if request.method == 'POST':
         receipt = request.form.get('receipt_number', '').strip().upper()
-        if receipt in report_storage:
+        if receipt in report_storage or get_report(receipt):
             return redirect(url_for('download_report', report_id=receipt))
         else:
             flash('Receipt number not found', 'error')
@@ -534,6 +594,10 @@ def get_report():
 
 @app.route('/download-report/<report_id>')
 def download_report(report_id):
+    if report_id not in report_storage:
+        db_report = get_report(report_id)
+        if db_report:
+            report_storage[report_id] = db_report
     if report_id not in report_storage:
         return "Report not found", 404
     

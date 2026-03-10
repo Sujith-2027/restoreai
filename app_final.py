@@ -5,6 +5,7 @@ ReStoreAI - FINAL COMPLETE VERSION
 
 from flask import Flask, request, render_template, redirect, url_for, send_file, flash
 import os
+TOMTOM_API_KEY = os.environ.get("TOMTOM_API_KEY", "gxB9bdSirhbwNexQAyo7CqOplqTxUPeB")
 import numpy as np
 from PIL import Image
 import tensorflow as tf

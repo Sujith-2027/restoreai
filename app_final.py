@@ -168,14 +168,32 @@ def get_nearby_places(city, user_lat, user_lon, device_name, repairability):
     icon          = "♻️" if location_key == "recycle" else "🔧"
 
     # Multiple keywords tried in order until results found
-    keywords = (
-        ["e-waste recycling center", "scrap dealer electronics", "e-waste disposal"]
-        if location_key == "recycle"
-        else ["mobile phone repair", "laptop repair shop", "electronics repair center"]
-    )
+    # Build device-specific search keywords
+    dev = device_name.lower()
+    if location_key == "recycle":
+        keywords = ["e-waste recycling center", "scrap dealer electronics", "e-waste disposal"]
+    elif "laptop" in dev or "computer" in dev:
+        keywords = ["laptop repair shop", "computer repair", "electronics repair center"]
+    elif "mobile" in dev or "tablet" in dev or "phone" in dev:
+        keywords = ["mobile phone repair", "smartphone repair", "electronics repair"]
+    elif "tv" in dev or "television" in dev:
+        keywords = ["tv repair shop", "television repair", "electronics repair center"]
+    elif "fridge" in dev or "refrigerator" in dev:
+        keywords = ["refrigerator repair", "fridge repair service", "home appliance repair"]
+    elif "washing" in dev or "washer" in dev:
+        keywords = ["washing machine repair", "home appliance repair", "electronics repair center"]
+    elif "ac" in dev or "air" in dev or "conditioner" in dev:
+        keywords = ["ac repair service", "air conditioner repair", "home appliance repair"]
+    else:
+        keywords = [f"{device_name} repair", "electronics repair center", "appliance repair shop"]
+    # Use device-specific search for View All
+    if location_key == "recycle":
+        search_term = f"{device_name} e-waste recycling near me"
+    else:
+        search_term = f"{device_name} repair shop near me"
     view_all_url = (
         f"https://www.google.com/maps/search/"
-        f"{urllib.parse.quote(keywords[0] + ' near me')}/@{user_lat},{user_lon},14z"
+        f"{urllib.parse.quote(search_term)}/@{user_lat},{user_lon},14z"
     )
 
     # ── TomTom Search API ────────────────────────────────────────────────────
@@ -649,4 +667,3 @@ if __name__ == '__main__':
     print("\nServer: http://localhost:5000")
     print("="*80 + "\n")
     app.run(debug=True, host='0.0.0.0', port=5000)
-    #run the code

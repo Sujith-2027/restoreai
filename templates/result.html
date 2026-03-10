@@ -306,6 +306,7 @@ Save this number to retrieve your report at <a href="/get-report">/get-report</a
 <div class="cost-amount">₹{{ cost_min }} - ₹{{ cost_max }}</div>
 </div>
 
+<link rel="stylesheet" href="/static/leaflet.css"/>
 <div class="map-container">
 <h3 style="text-align:center;">Nearby {{ location_type|upper }}</h3>
 <p style="text-align:center;color:var(--muted);">Your Location: {{ location_display }}</p>
@@ -344,48 +345,7 @@ Save this number to retrieve your report at <a href="/get-report">/get-report</a
 
 </div>
 
-<link rel="stylesheet" href="/static/leaflet.css"/>
 <script src="/static/leaflet.js"></script>
-<style>
-/* Google Maps quality UI */
-.map-controls {
-    position:absolute; top:12px; right:12px; z-index:1000;
-    display:flex; flex-direction:column; gap:6px;
-}
-.map-btn {
-    background:rgba(15,23,42,0.92); color:#e2e8f0;
-    border:1px solid #334155; border-radius:8px;
-    padding:6px 12px; font-size:12px; font-weight:600;
-    cursor:pointer; transition:0.2s; backdrop-filter:blur(8px);
-    white-space:nowrap;
-}
-.map-btn:hover, .map-btn.active { background:#16a34a; color:#fff; border-color:#16a34a; }
-.map-zoom {
-    position:absolute; bottom:16px; right:12px; z-index:1000;
-    display:flex; flex-direction:column; gap:4px;
-}
-.map-zoom button {
-    width:36px; height:36px; background:rgba(15,23,42,0.92);
-    color:#e2e8f0; border:1px solid #334155; border-radius:8px;
-    font-size:20px; cursor:pointer; display:flex;
-    align-items:center; justify-content:center;
-    transition:0.2s; backdrop-filter:blur(8px); padding:0;
-}
-.map-zoom button:hover { background:#16a34a; border-color:#16a34a; }
-.leaflet-popup-content-wrapper {
-    background:#1e293b; color:#e2e8f0;
-    border:1px solid #334155; border-radius:12px;
-    box-shadow:0 20px 40px rgba(0,0,0,0.5);
-}
-.leaflet-popup-tip { background:#1e293b; }
-.leaflet-popup-close-button { color:#94a3b8 !important; }
-.leaflet-control-attribution {
-    background:rgba(15,23,42,0.8) !important;
-    color:#64748b !important; font-size:10px;
-    backdrop-filter:blur(4px);
-}
-.leaflet-control-attribution a { color:#16a34a !important; }
-</style>
 <script>
 (function(){
     var userLat = parseFloat("{{ user_lat }}");

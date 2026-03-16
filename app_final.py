@@ -265,17 +265,27 @@ def get_nearby_places(city, user_lat, user_lon, device_name, repairability):
     except Exception as e2:
         print(f"⚠️ Overpass error: {e2}")
 
-    # ── Last resort: offset pins near user ───────────────────────────────────
+    # ── Last resort: Google Maps search links near user ─────────────────────
     offsets = [(0.004, 0.003), (-0.003, 0.005), (0.005, -0.004)]
     places  = []
-    label   = "Recycling Center" if location_key == "recycle" else "Repair Shop"
+    fallback_names = (
+        [f"{device_name} Recycling Center", "E-Waste Collection Point", "Scrap Dealer"]
+        if location_key == "recycle"
+        else [f"{device_name} Service Center", f"{device_name} Repair Shop", "Electronics Repair"]
+    )
+    search_q = urllib.parse.quote(
+        f"{device_name} {'recycling' if location_key == 'recycle' else 'repair'} near me"
+    )
     for i, (dlat, dlon) in enumerate(offsets):
         lat2, lon2 = user_lat + dlat, user_lon + dlon
         d = calculate_distance(user_lat, user_lon, lat2, lon2)
         places.append({
-            "icon": icon, "name": f"{label} {i+1}", "address": city,
-            "distance": f"{d:.1f} km", "rating": "N/A", "reviews": 0,
-            "maps_url": f"https://www.google.com/maps/search/{urllib.parse.quote(label)}/@{lat2},{lon2},16z",
+            "icon": icon,
+            "name": fallback_names[i],
+            "address": f"Near {city} (approx.)",
+            "distance": f"{d:.1f} km",
+            "rating": "N/A", "reviews": 0,
+            "maps_url": f"https://www.google.com/maps/search/{search_q}/@{lat2},{lon2},15z",
             "lat": lat2, "lon": lon2
         })
     return location_type, places, view_all_url

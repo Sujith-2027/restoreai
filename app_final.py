@@ -5,7 +5,7 @@ ReStoreAI - FINAL COMPLETE VERSION
 
 from flask import Flask, request, render_template, redirect, url_for, send_file, flash
 import os
-TOMTOM_API_KEY = os.environ.get("TOMTOM_API_KEY", "gxB9bdSirhbwNexQAyo7CqOplqTxUPeB")
+import requests as req_lib
 import numpy as np
 from PIL import Image
 import tensorflow as tf
@@ -26,6 +26,8 @@ from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
+
+TOMTOM_API_KEY = os.environ.get("TOMTOM_API_KEY", "gxB9bdSirhbwNexQAyo7CqOplqTxUPeB")
 
 app = Flask(__name__)
 app.secret_key = 'restoreai_secret_2026_fixed'
@@ -168,32 +170,14 @@ def get_nearby_places(city, user_lat, user_lon, device_name, repairability):
     icon          = "♻️" if location_key == "recycle" else "🔧"
 
     # Multiple keywords tried in order until results found
-    # Build device-specific search keywords
-    dev = device_name.lower()
-    if location_key == "recycle":
-        keywords = ["e-waste recycling center", "scrap dealer electronics", "e-waste disposal"]
-    elif "laptop" in dev or "computer" in dev:
-        keywords = ["laptop repair shop", "computer repair", "electronics repair center"]
-    elif "mobile" in dev or "tablet" in dev or "phone" in dev:
-        keywords = ["mobile phone repair", "smartphone repair", "electronics repair"]
-    elif "tv" in dev or "television" in dev:
-        keywords = ["tv repair shop", "television repair", "electronics repair center"]
-    elif "fridge" in dev or "refrigerator" in dev:
-        keywords = ["refrigerator repair", "fridge repair service", "home appliance repair"]
-    elif "washing" in dev or "washer" in dev:
-        keywords = ["washing machine repair", "home appliance repair", "electronics repair center"]
-    elif "ac" in dev or "air" in dev or "conditioner" in dev:
-        keywords = ["ac repair service", "air conditioner repair", "home appliance repair"]
-    else:
-        keywords = [f"{device_name} repair", "electronics repair center", "appliance repair shop"]
-    # Use device-specific search for View All
-    if location_key == "recycle":
-        search_term = f"{device_name} e-waste recycling near me"
-    else:
-        search_term = f"{device_name} repair shop near me"
+    keywords = (
+        ["e-waste recycling center", "scrap dealer electronics", "e-waste disposal"]
+        if location_key == "recycle"
+        else ["mobile phone repair", "laptop repair shop", "electronics repair center"]
+    )
     view_all_url = (
         f"https://www.google.com/maps/search/"
-        f"{urllib.parse.quote(search_term)}/@{user_lat},{user_lon},14z"
+        f"{urllib.parse.quote(keywords[0] + ' near me')}/@{user_lat},{user_lon},14z"
     )
 
     # ── TomTom Search API ────────────────────────────────────────────────────
@@ -265,27 +249,17 @@ def get_nearby_places(city, user_lat, user_lon, device_name, repairability):
     except Exception as e2:
         print(f"⚠️ Overpass error: {e2}")
 
-    # ── Last resort: Google Maps search links near user ─────────────────────
+    # ── Last resort: offset pins near user ───────────────────────────────────
     offsets = [(0.004, 0.003), (-0.003, 0.005), (0.005, -0.004)]
     places  = []
-    fallback_names = (
-        [f"{device_name} Recycling Center", "E-Waste Collection Point", "Scrap Dealer"]
-        if location_key == "recycle"
-        else [f"{device_name} Service Center", f"{device_name} Repair Shop", "Electronics Repair"]
-    )
-    search_q = urllib.parse.quote(
-        f"{device_name} {'recycling' if location_key == 'recycle' else 'repair'} near me"
-    )
+    label   = "Recycling Center" if location_key == "recycle" else "Repair Shop"
     for i, (dlat, dlon) in enumerate(offsets):
         lat2, lon2 = user_lat + dlat, user_lon + dlon
         d = calculate_distance(user_lat, user_lon, lat2, lon2)
         places.append({
-            "icon": icon,
-            "name": fallback_names[i],
-            "address": f"Near {city} (approx.)",
-            "distance": f"{d:.1f} km",
-            "rating": "N/A", "reviews": 0,
-            "maps_url": f"https://www.google.com/maps/search/{search_q}/@{lat2},{lon2},15z",
+            "icon": icon, "name": f"{label} {i+1}", "address": city,
+            "distance": f"{d:.1f} km", "rating": "N/A", "reviews": 0,
+            "maps_url": f"https://www.google.com/maps/search/{urllib.parse.quote(label)}/@{lat2},{lon2},16z",
             "lat": lat2, "lon": lon2
         })
     return location_type, places, view_all_url
@@ -666,6 +640,35 @@ def download_report(report_id):
     doc.build(story)
     buffer.seek(0)
     return send_file(buffer, as_attachment=True, download_name=f'ReStoreAI_Report_{report_id}.pdf', mimetype='application/pdf')
+
+@app.route('/overpass', methods=['POST'])
+def overpass_proxy():
+    from flask import Response, request as freq
+    try:
+        r = req_lib.post("https://overpass-api.de/api/interpreter",
+                         data=freq.get_data(), timeout=15)
+        return Response(r.content, content_type="application/json",
+                        headers={"Access-Control-Allow-Origin": "*"})
+    except:
+        return {"elements": []}, 200
+
+@app.route('/tiles/<int:z>/<int:x>/<int:y>.png')
+def tile_proxy(z, x, y):
+    from flask import Response
+    for url in [
+        f"https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+        f"https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    ]:
+        try:
+            r = req_lib.get(url, timeout=8, headers={"User-Agent": "Mozilla/5.0"})
+            if r.status_code == 200:
+                return Response(r.content, content_type="image/png",
+                                headers={"Cache-Control": "public, max-age=86400"})
+        except: continue
+    import base64
+    blank = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
+    return Response(blank, content_type="image/png")
+
 
 if __name__ == '__main__':
     print("="*80)

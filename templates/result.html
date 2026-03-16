@@ -384,8 +384,8 @@ Save this number to retrieve your report at <a href="/get-report">/get-report</a
 
 </div>
 
-<link rel="stylesheet" href="/static/leaflet.css"/>
-<script src="/static/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 /* Google Maps quality UI */
 .map-controls {
@@ -436,8 +436,8 @@ Save this number to retrieve your report at <a href="/get-report">/get-report</a
     // Fix Leaflet icon paths
     delete L.Icon.Default.prototype._getIconUrl;
     L.Icon.Default.mergeOptions({
-        iconUrl: '/static/marker-icon.png',
-        shadowUrl: '/static/marker-shadow.png',
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
     });
 
     var map = L.map('map', {
@@ -447,22 +447,24 @@ Save this number to retrieve your report at <a href="/get-report">/get-report</a
         attributionControl: true
     });
 
-    // ── Tile layers (direct public CDN - no API key, always works) ──────────
-    var tomtomDark = L.tileLayer(
-        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-        { attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors', maxZoom: 19 }
+    // ── Tile layers (direct CDN, no API key needed) ─────────────────────────
+    var darkLayer = L.tileLayer(
+        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        { attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors', subdomains: 'abc', maxZoom: 19 }
     );
-    var tomtomDay = L.tileLayer(
-        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-        { attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors', maxZoom: 19 }
+    var dayLayer = L.tileLayer(
+        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        { attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors', subdomains: 'abc', maxZoom: 19 }
     );
     var satellite = L.tileLayer(
         'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         { attribution: '&copy; Esri World Imagery', maxZoom: 19 }
     );
+    var tomtomDark = darkLayer;
+    var tomtomDay  = dayLayer;
 
-    // Start with default map
-    tomtomDark.addTo(map);
+    // Start with map
+    darkLayer.addTo(map);
     var currentLayer = 'dark';
 
     // ── Custom controls ──────────────────────────────────────────────────────

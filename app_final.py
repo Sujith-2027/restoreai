@@ -175,9 +175,14 @@ def get_nearby_places(city, user_lat, user_lon, device_name, repairability):
         if location_key == "recycle"
         else ["mobile phone repair", "laptop repair shop", "electronics repair center"]
     )
+    search_term = (
+        f"{device_name} e-waste recycling near me"
+        if location_key == "recycle"
+        else f"{device_name} repair shop near me"
+    )
     view_all_url = (
         f"https://www.google.com/maps/search/"
-        f"{urllib.parse.quote(keywords[0] + ' near me')}/@{user_lat},{user_lon},14z"
+        f"{urllib.parse.quote(search_term)}/@{user_lat},{user_lon},14z"
     )
 
     # ── TomTom Search API ────────────────────────────────────────────────────

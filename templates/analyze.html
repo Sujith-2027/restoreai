@@ -5,6 +5,8 @@
 {% block extra_css %}
 <style>
 .upload-area{
+    display:block;
+    width:100%;
     border:2px dashed #16a34a;
     padding:60px 40px;
     border-radius:16px;
@@ -15,6 +17,7 @@
     position:relative;
     user-select:none;
     -webkit-user-select:none;
+    box-sizing:border-box;
 }
 .upload-area *{ pointer-events:none; }
 .upload-area:hover{

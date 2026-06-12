@@ -27,7 +27,10 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
-TOMTOM_API_KEY = os.environ.get("TOMTOM_API_KEY", "gxB9bdSirhbwNexQAyo7CqOplqTxUPeB")
+import base64
+
+TOMTOM_API_KEY  = os.environ.get("TOMTOM_API_KEY",  "gxB9bdSirhbwNexQAyo7CqOplqTxUPeB")
+GEMINI_API_KEY  = os.environ.get("GEMINI_API_KEY",  "")   # set in Render env vars
 
 app = Flask(__name__)
 app.secret_key = 'restoreai_secret_2026_fixed'
@@ -111,44 +114,161 @@ def preprocess_image(path):
     img = img.resize((IMG_SIZE, IMG_SIZE))
     return np.expand_dims(np.array(img) / 255.0, axis=0)
 
-def calculate_damage_analysis(confidence, device_age):
-    # Low confidence = model struggled to recognize device = likely heavily damaged/unusual appearance
-    # High confidence = clear recognizable device = mostly normal, damage from age
-    uncertainty = max(0, (100 - confidence))  # 0-100, higher = more damaged looking
+def _damage_formula_fallback(confidence, device_age):
+    """Original formula — used only when Gemini is unavailable."""
+    uncertainty = max(0, (100 - confidence))
     age_factor  = min(device_age / 10.0, 1.0)
-
     cracks  = min(uncertainty * 0.65 + age_factor * 20, 100)
     rust    = min(uncertainty * 0.40 + age_factor * 30, 100)
     broken  = min(uncertainty * 0.75 + age_factor * 15, 100)
+    return round(cracks, 1), round(rust, 1), round(broken, 1), round(age_factor * 100, 1)
+
+
+def analyse_damage_with_gemini(image_path, device_name, device_age):
+    """
+    Send the actual device image to Gemini 2.5 Flash (free tier: 1500 req/day).
+    Returns a dict with cracks, rust, broken, cost_min, cost_max, reasoning.
+    Falls back gracefully if API key is missing or call fails.
+    """
+    if not GEMINI_API_KEY:
+        return None   # caller will use formula fallback
+
+    try:
+        # Read image and convert to base64 so we can send it to Gemini
+        with open(image_path, "rb") as f:
+            img_bytes = f.read()
+        img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+
+        # Detect mime type from file extension
+        ext = image_path.rsplit(".", 1)[-1].lower()
+        mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png"}.get(ext, "image/jpeg")
+
+        prompt = f"""You are an expert electronics repair technician in India.
+Analyse this image of a {device_name} that is {device_age} years old.
+
+Return ONLY a valid JSON object (no markdown, no extra text) with these exact keys:
+{{
+  "cracks": <0-100 integer, percentage of surface showing cracks or screen damage>,
+  "rust": <0-100 integer, percentage showing rust or corrosion>,
+  "broken": <0-100 integer, percentage of parts that are broken or missing>,
+  "cost_min": <integer, minimum realistic repair cost in Indian Rupees>,
+  "cost_max": <integer, maximum realistic repair cost in Indian Rupees>,
+  "reasoning": "<one sentence explaining the damage you see>"
+}}
+
+Rules:
+- Base cost on actual Indian repair market rates (2024-2025).
+- If the device looks undamaged, set cracks/rust/broken all to 0-5.
+- If the image is unclear, estimate conservatively.
+- Return ONLY the JSON, nothing else."""
+
+        payload = {
+            "contents": [{
+                "parts": [
+                    {"inline_data": {"mime_type": mime, "data": img_b64}},
+                    {"text": prompt}
+                ]
+            }]
+        }
+
+        url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
+               f"gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}")
+
+        resp = req_lib.post(url, json=payload, timeout=20)
+        resp.raise_for_status()
+        raw = resp.json()
+
+        text = raw["candidates"][0]["content"]["parts"][0]["text"].strip()
+        # Strip markdown fences if Gemini wraps in ```json ... ```
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        text = text.strip()
+
+        result = json.loads(text)
+        print(f"✅ Gemini damage analysis: {result}")
+        return result
+
+    except Exception as e:
+        print(f"⚠️ Gemini damage analysis failed: {e}")
+        return None
+
+
+def calculate_damage_analysis(confidence, device_age, image_path=None, device_name="device", device_info=None):
+    """
+    Main damage analysis function.
+    Tries Gemini Vision first (real AI on the actual image).
+    Falls back to the original formula if Gemini is unavailable.
+    """
+    gemini_result = None
+    if image_path:
+        gemini_result = analyse_damage_with_gemini(image_path, device_name, device_age)
+
+    age_factor  = min(device_age / 10.0, 1.0)
+    age_impact  = round(age_factor * 100, 1)
+
+    if gemini_result:
+        cracks = min(float(gemini_result.get("cracks", 20)), 100)
+        rust   = min(float(gemini_result.get("rust",   10)), 100)
+        broken = min(float(gemini_result.get("broken", 15)), 100)
+        # Store Gemini's cost suggestion so caller can optionally use it
+        gemini_cost = {
+            "min": gemini_result.get("cost_min"),
+            "max": gemini_result.get("cost_max"),
+            "reasoning": gemini_result.get("reasoning", "")
+        }
+    else:
+        cracks, rust, broken, age_impact = _damage_formula_fallback(confidence, device_age)
+        gemini_cost = None
 
     overall_damage = round((cracks + rust + broken) / 3, 1)
-    age_impact     = round(age_factor * 100, 1)
 
-    # <30 = repairable, 30-65 = mostly repairable, >65 = not repairable / recycle
     if overall_damage < 30:
-        repairability      = "Repairable"
+        repairability       = "Repairable"
         repairability_class = "repairable"
-        repairability_icon = "✅"
-        status_color       = "#0a4d0a"
+        repairability_icon  = "✅"
+        status_color        = "#0a4d0a"
     elif overall_damage < 65:
-        repairability      = "Mostly Repairable"
+        repairability       = "Mostly Repairable"
         repairability_class = "mostly"
-        repairability_icon = "⚠️"
-        status_color       = "#d4af37"
+        repairability_icon  = "⚠️"
+        status_color        = "#d4af37"
     else:
-        repairability      = "Not Repairable"
+        repairability       = "Not Repairable"
         repairability_class = "not"
-        repairability_icon = "❌"
-        status_color       = "#8b0000"
+        repairability_icon  = "❌"
+        status_color        = "#8b0000"
 
     return {
         "cracks": round(cracks, 1), "rust": round(rust, 1), "broken": round(broken, 1),
         "overall": overall_damage, "age_impact": age_impact,
         "repairability": repairability, "repairability_class": repairability_class,
-        "repairability_icon": repairability_icon, "status_color": status_color
+        "repairability_icon": repairability_icon, "status_color": status_color,
+        "gemini_cost": gemini_cost,
+        "ai_powered": gemini_cost is not None
     }
 
-def calculate_repair_cost(device_info, overall_damage):
+def calculate_repair_cost(device_info, overall_damage, gemini_cost=None):
+    """
+    If Gemini already gave us a cost estimate (from the image), use that.
+    Otherwise fall back to the formula.
+    """
+    if gemini_cost and gemini_cost.get("min") and gemini_cost.get("max"):
+        try:
+            cost_min = int(gemini_cost["min"])
+            cost_max = int(gemini_cost["max"])
+            # Sanity-check: keep within device-type bounds × 1.5 buffer
+            hard_max = int(device_info['base_cost_max'] * 1.5)
+            hard_min = max(int(device_info['base_cost_min'] * 0.5), 500)
+            cost_min = max(hard_min, min(cost_min, hard_max))
+            cost_max = max(cost_min + 500, min(cost_max, hard_max))
+            print(f"✅ Using Gemini cost estimate: ₹{cost_min} - ₹{cost_max}")
+            return cost_min, cost_max
+        except Exception as e:
+            print(f"⚠️ Gemini cost parse error: {e}")
+
+    # Original formula fallback
     base_min, base_max = device_info['base_cost_min'], device_info['base_cost_max']
     damage_factor = overall_damage / 100
     cost_min = int(base_min + (base_max - base_min) * damage_factor * 0.3)
@@ -164,110 +284,136 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     return R * c
 
 def get_nearby_places(city, user_lat, user_lon, device_name, repairability):
-    city = city.strip().title()
-    location_key  = "recycle" if repairability == "Not Repairable" else "repair"
-    location_type = "Recycling Centers" if location_key == "recycle" else "Repair Shops"
-    icon          = "♻️" if location_key == "recycle" else "🔧"
+    """
+    Find real nearby repair/recycle shops.
+    Strategy (all free, no fake data):
+      1. OpenStreetMap Overpass API  — global, free, no key needed  ← PRIMARY
+      2. TomTom Search API           — free tier, needs key          ← SECONDARY
+      3. Nominatim geocode fallback  — if GPS missing, geocode city  ← GPS HELPER
+    Never returns made-up/fake places. Returns empty list if nothing real found.
+    """
+    city          = city.strip().title()
+    is_recycle    = (repairability == "Not Repairable")
+    location_type = "Recycling Centers" if is_recycle else "Repair Shops"
+    icon          = "♻️" if is_recycle else "🔧"
+    search_term   = (f"{device_name} e-waste recycling near me"
+                     if is_recycle else f"{device_name} repair shop near me")
+    view_all_url  = (f"https://www.google.com/maps/search/"
+                     f"{urllib.parse.quote(search_term)}/@{user_lat},{user_lon},14z")
 
-    # Multiple keywords tried in order until results found
+    # ── If no GPS co-ords, geocode city name via free Nominatim ─────────────
+    if not user_lat or not user_lon:
+        try:
+            geo_url = (f"https://nominatim.openstreetmap.org/search"
+                       f"?q={urllib.parse.quote(city)}&format=json&limit=1")
+            geo_r   = req_lib.get(geo_url, timeout=8,
+                                  headers={"User-Agent": "ReStoreAI/1.0"})
+            geo_data = geo_r.json()
+            if geo_data:
+                user_lat = float(geo_data[0]["lat"])
+                user_lon = float(geo_data[0]["lon"])
+                print(f"✅ Nominatim geocoded {city}: {user_lat},{user_lon}")
+        except Exception as e:
+            print(f"⚠️ Nominatim geocode failed: {e}")
+            user_lat, user_lon = 19.0760, 72.8777   # Mumbai centre as last resort
+
+    # ── PRIMARY: Overpass OSM (free, global, no API key) ────────────────────
+    if is_recycle:
+        osm_query = f"""[out:json][timeout:15];
+(
+  node["amenity"="recycling"](around:8000,{user_lat},{user_lon});
+  node["shop"="scrap"](around:8000,{user_lat},{user_lon});
+  node["recycling:electronics"="yes"](around:8000,{user_lat},{user_lon});
+  node["amenity"="waste_disposal"](around:8000,{user_lat},{user_lon});
+);
+out body;"""
+    else:
+        osm_query = f"""[out:json][timeout:15];
+(
+  node["shop"="electronics"](around:5000,{user_lat},{user_lon});
+  node["shop"="mobile_phone"](around:5000,{user_lat},{user_lon});
+  node["shop"="computer"](around:5000,{user_lat},{user_lon});
+  node["craft"="electronics_repair"](around:5000,{user_lat},{user_lon});
+  node["shop"="repair"](around:5000,{user_lat},{user_lon});
+);
+out body;"""
+
+    try:
+        osm_r    = req_lib.post("https://overpass-api.de/api/interpreter",
+                                data=osm_query, timeout=15)
+        elements = [e for e in osm_r.json().get("elements", [])
+                    if e.get("tags", {}).get("name")]   # only named, real places
+
+        if elements:
+            elements.sort(key=lambda e: calculate_distance(
+                user_lat, user_lon, e["lat"], e["lon"]))
+            places = []
+            for el in elements[:3]:
+                d   = calculate_distance(user_lat, user_lon, el["lat"], el["lon"])
+                ds  = f"{int(d * 1000)} m" if d < 1 else f"{d:.1f} km"
+                t   = el.get("tags", {})
+                places.append({
+                    "icon"    : icon,
+                    "name"    : t.get("name", "Repair Shop"),
+                    "address" : (t.get("addr:full") or t.get("addr:street")
+                                 or t.get("addr:suburb") or city),
+                    "distance": ds,
+                    "rating"  : "N/A",
+                    "reviews" : 0,
+                    "maps_url": f"https://www.google.com/maps/dir/?api=1&destination={el['lat']},{el['lon']}",
+                    "lat"     : el["lat"],
+                    "lon"     : el["lon"]
+                })
+            print(f"✅ Overpass: {len(places)} real places found")
+            return location_type, places, view_all_url
+        else:
+            print("ℹ️ Overpass: 0 named places — trying TomTom")
+    except Exception as e:
+        print(f"⚠️ Overpass failed: {e} — trying TomTom")
+
+    # ── SECONDARY: TomTom (only if Overpass returns nothing) ─────────────────
     keywords = (
         ["e-waste recycling center", "scrap dealer electronics", "e-waste disposal"]
-        if location_key == "recycle"
+        if is_recycle
         else ["mobile phone repair", "laptop repair shop", "electronics repair center"]
     )
-    search_term = (
-        f"{device_name} e-waste recycling near me"
-        if location_key == "recycle"
-        else f"{device_name} repair shop near me"
-    )
-    view_all_url = (
-        f"https://www.google.com/maps/search/"
-        f"{urllib.parse.quote(search_term)}/@{user_lat},{user_lon},14z"
-    )
-
-    # ── TomTom Search API ────────────────────────────────────────────────────
-    results = []
     for kw in keywords:
         try:
-            url = (
-                f"https://api.tomtom.com/search/2/search/"
-                f"{urllib.parse.quote(kw)}.json"
-                f"?key={TOMTOM_API_KEY}"
-                f"&lat={user_lat}&lon={user_lon}"
-                f"&radius=5000&limit=10&countrySet=IN"
-            )
-            r = req_lib.get(url, timeout=10)
-            r.raise_for_status()
-            results = r.json().get("results", [])
+            tt_url  = (f"https://api.tomtom.com/search/2/search/"
+                       f"{urllib.parse.quote(kw)}.json"
+                       f"?key={TOMTOM_API_KEY}"
+                       f"&lat={user_lat}&lon={user_lon}"
+                       f"&radius=5000&limit=10&countrySet=IN")
+            tt_r    = req_lib.get(tt_url, timeout=10)
+            tt_r.raise_for_status()
+            results = tt_r.json().get("results", [])
             if results:
-                print(f"✅ TomTom: {len(results)} results for '{kw}'")
-                break
+                places = []
+                for item in results[:3]:
+                    pos   = item.get("position", {})
+                    addr  = item.get("address", {})
+                    dm    = item.get("dist", 0)
+                    ds    = f"{int(dm)} m" if dm < 1000 else f"{dm/1000:.1f} km"
+                    lat   = pos.get("lat", user_lat)
+                    lon   = pos.get("lon", user_lon)
+                    places.append({
+                        "icon"    : icon,
+                        "name"    : item.get("poi", {}).get("name", "Repair Shop"),
+                        "address" : addr.get("freeformAddress", city),
+                        "distance": ds,
+                        "rating"  : "N/A",
+                        "reviews" : 0,
+                        "maps_url": f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}",
+                        "lat": lat, "lon": lon
+                    })
+                print(f"✅ TomTom: {len(places)} real places for '{kw}'")
+                return location_type, places, view_all_url
         except Exception as e:
             print(f"⚠️ TomTom error for '{kw}': {e}")
 
-    if results:
-        places = []
-        for item in results[:3]:
-            pos      = item.get("position", {})
-            addr     = item.get("address", {})
-            dist_m   = item.get("dist", 0)
-            dist_str = f"{int(dist_m)} m" if dist_m < 1000 else f"{dist_m/1000:.1f} km"
-            lat      = pos.get("lat", user_lat)
-            lon      = pos.get("lon", user_lon)
-            places.append({
-                "icon"    : icon,
-                "name"    : item.get("poi", {}).get("name", "Repair Shop"),
-                "address" : addr.get("freeformAddress", city),
-                "distance": dist_str,
-                "rating"  : "N/A",
-                "reviews" : 0,
-                "maps_url": f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}",
-                "lat": lat, "lon": lon
-            })
-        return location_type, places, view_all_url
-
-    # ── Fallback: Overpass OSM ───────────────────────────────────────────────
-    try:
-        q = f"""[out:json][timeout:10];
-        (node["shop"="repair"](around:5000,{user_lat},{user_lon});
-         node["craft"="electronics_repair"](around:5000,{user_lat},{user_lon});
-         node["shop"="electronics"](around:5000,{user_lat},{user_lon}););
-        out body;"""
-        r2 = req_lib.post("https://overpass-api.de/api/interpreter", data=q, timeout=12)
-        elements = [e for e in r2.json().get("elements", []) if e.get("tags", {}).get("name")]
-        if elements:
-            elements.sort(key=lambda e: calculate_distance(user_lat, user_lon, e["lat"], e["lon"]))
-            places = []
-            for el in elements[:3]:
-                d  = calculate_distance(user_lat, user_lon, el["lat"], el["lon"])
-                ds = f"{int(d*1000)} m" if d < 1 else f"{d:.1f} km"
-                t  = el.get("tags", {})
-                places.append({
-                    "icon": icon, "name": t.get("name", "Repair Shop"),
-                    "address": t.get("addr:full") or t.get("addr:street") or city,
-                    "distance": ds, "rating": "N/A", "reviews": 0,
-                    "maps_url": f"https://www.google.com/maps/dir/?api=1&destination={el['lat']},{el['lon']}",
-                    "lat": el["lat"], "lon": el["lon"]
-                })
-            print(f"✅ Overpass found {len(places)} shops")
-            return location_type, places, view_all_url
-    except Exception as e2:
-        print(f"⚠️ Overpass error: {e2}")
-
-    # ── Last resort: offset pins near user ───────────────────────────────────
-    offsets = [(0.004, 0.003), (-0.003, 0.005), (0.005, -0.004)]
-    places  = []
-    label   = "Recycling Center" if location_key == "recycle" else "Repair Shop"
-    for i, (dlat, dlon) in enumerate(offsets):
-        lat2, lon2 = user_lat + dlat, user_lon + dlon
-        d = calculate_distance(user_lat, user_lon, lat2, lon2)
-        places.append({
-            "icon": icon, "name": f"{label} {i+1}", "address": city,
-            "distance": f"{d:.1f} km", "rating": "N/A", "reviews": 0,
-            "maps_url": f"https://www.google.com/maps/search/{urllib.parse.quote(label)}/@{lat2},{lon2},16z",
-            "lat": lat2, "lon": lon2
-        })
-    return location_type, places, view_all_url
+    # ── NO FAKE PINS — return empty; result.html will show a friendly message ─
+    print("⚠️ No real places found from any source. Returning empty list.")
+    return location_type, [], view_all_url
 
 @app.route('/')
 def home():
@@ -355,9 +501,18 @@ def analyze():
                     print(f"Corrected AC->WashingMachine aspect={aspect:.2f}")
 
             info = DEVICE_INFO[device_key]
-            
-            damage_analysis = calculate_damage_analysis(confidence, device_age)
-            cost_min, cost_max = calculate_repair_cost(info, damage_analysis['overall'])
+
+            # FIX: pass the actual image + device name so Gemini Vision can analyse it
+            damage_analysis = calculate_damage_analysis(
+                confidence, device_age,
+                image_path=filepath,
+                device_name=info['display_name']
+            )
+            # FIX: use Gemini's cost estimate when available
+            cost_min, cost_max = calculate_repair_cost(
+                info, damage_analysis['overall'],
+                gemini_cost=damage_analysis.get('gemini_cost')
+            )
             location_type, nearby_places, view_all_url = get_nearby_places(city, user_lat, user_lon, info['display_name'], damage_analysis['repairability'])
             receipt_number = generate_receipt_number()
             
@@ -399,7 +554,9 @@ def analyze():
                 view_all_maps_url=view_all_url, user_lat=user_lat, user_lon=user_lon,
                 places_json=json.dumps(nearby_places),
                 tomtom_key=TOMTOM_API_KEY,
-                map_query=urllib.parse.quote(f"{info['display_name']} repair {city}"))
+                map_query=urllib.parse.quote(f"{info['display_name']} repair {city}"),
+                ai_powered=damage_analysis.get('ai_powered', False),
+                gemini_reasoning=damage_analysis.get('gemini_cost', {}).get('reasoning', '') if damage_analysis.get('gemini_cost') else '')
         except Exception as e:
             print(f"Error: {e}")
             import traceback

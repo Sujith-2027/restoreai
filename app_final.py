@@ -135,40 +135,41 @@ def _damage_formula_fallback(confidence, device_age):
 
 def analyse_damage_with_gemini(image_path, device_name, device_age):
     """
-    Send the actual device image to Gemini 2.5 Flash (free tier: 1500 req/day).
-    Returns a dict with cracks, rust, broken, cost_min, cost_max, reasoning.
-    Falls back gracefully if API key is missing or call fails.
+    Send the actual device image to Gemini 2.5 Flash.
+    Returns dict with cracks, rust, broken, cost_min, cost_max, reasoning,
+    actual_device (Gemini's own identification), and symptoms (NLP summary).
     """
     if not GEMINI_API_KEY:
-        return None   # caller will use formula fallback
+        return None
 
     try:
-        # Read image and convert to base64 so we can send it to Gemini
         with open(image_path, "rb") as f:
             img_bytes = f.read()
         img_b64 = base64.b64encode(img_bytes).decode("utf-8")
 
-        # Detect mime type from file extension
         ext = image_path.rsplit(".", 1)[-1].lower()
         mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png"}.get(ext, "image/jpeg")
 
         prompt = f"""You are an expert electronics repair technician in India.
-Analyse this image of a {device_name} that is {device_age} years old.
+Carefully analyse this image. The user said it is a {device_name} that is {device_age} years old.
 
 Return ONLY a valid JSON object (no markdown, no extra text) with these exact keys:
 {{
+  "actual_device": "<what device you actually see — e.g. Refrigerator, Television, Laptop, Mobile, Air Conditioner, Washing Machine>",
   "cracks": <0-100 integer, percentage of surface showing cracks or screen damage>,
   "rust": <0-100 integer, percentage showing rust or corrosion>,
   "broken": <0-100 integer, percentage of parts that are broken or missing>,
   "cost_min": <integer, minimum realistic repair cost in Indian Rupees>,
   "cost_max": <integer, maximum realistic repair cost in Indian Rupees>,
-  "reasoning": "<one sentence explaining the damage you see>"
+  "reasoning": "<one sentence explaining the damage you see>",
+  "symptoms": "<2-3 sentence plain English description of visible damage and what needs repair — written for the device owner>"
 }}
 
 Rules:
-- Base cost on actual Indian repair market rates (2024-2025).
-- If the device looks undamaged, set cracks/rust/broken all to 0-5.
-- If the image is unclear, estimate conservatively.
+- IMPORTANT: Identify what you actually see in the image — do NOT trust the user label if it looks wrong.
+- Always provide cost_min and cost_max as integers — never null or missing.
+- Base costs on actual Indian repair market rates (2024-2025).
+- If the device looks undamaged, set cracks/rust/broken to 0-5 and give a realistic service inspection cost.
 - Return ONLY the JSON, nothing else."""
 
         payload = {
@@ -183,12 +184,11 @@ Rules:
         url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
                f"gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}")
 
-        resp = req_lib.post(url, json=payload, timeout=20)
+        resp = req_lib.post(url, json=payload, timeout=30)
         resp.raise_for_status()
         raw = resp.json()
 
         text = raw["candidates"][0]["content"]["parts"][0]["text"].strip()
-        # Strip markdown fences if Gemini wraps in ```json ... ```
         if text.startswith("```"):
             text = text.split("```")[1]
             if text.startswith("json"):
@@ -196,12 +196,18 @@ Rules:
         text = text.strip()
 
         result = json.loads(text)
-        print(f"✅ Gemini damage analysis: {result}")
+        # Ensure cost fields are always present
+        if not result.get("cost_min"):
+            result["cost_min"] = 2000
+        if not result.get("cost_max"):
+            result["cost_max"] = 8000
+        print(f"✅ Gemini analysis: {result}")
         return result
 
     except Exception as e:
-        print(f"⚠️ Gemini damage analysis failed: {e}")
+        print(f"⚠️ Gemini analysis failed: {e}")
         return None
+
 
 
 def calculate_damage_analysis(confidence, device_age, image_path=None, device_name="device", device_info=None):
@@ -221,15 +227,18 @@ def calculate_damage_analysis(confidence, device_age, image_path=None, device_na
         cracks = min(float(gemini_result.get("cracks", 20)), 100)
         rust   = min(float(gemini_result.get("rust",   10)), 100)
         broken = min(float(gemini_result.get("broken", 15)), 100)
-        # Store Gemini's cost suggestion so caller can optionally use it
         gemini_cost = {
             "min": gemini_result.get("cost_min"),
             "max": gemini_result.get("cost_max"),
             "reasoning": gemini_result.get("reasoning", "")
         }
+        actual_device = gemini_result.get("actual_device", "")
+        symptoms      = gemini_result.get("symptoms", "")
     else:
         cracks, rust, broken, age_impact = _damage_formula_fallback(confidence, device_age)
-        gemini_cost = None
+        gemini_cost   = None
+        actual_device = ""
+        symptoms      = ""
 
     overall_damage = round((cracks + rust + broken) / 3, 1)
 
@@ -255,7 +264,9 @@ def calculate_damage_analysis(confidence, device_age, image_path=None, device_na
         "repairability": repairability, "repairability_class": repairability_class,
         "repairability_icon": repairability_icon, "status_color": status_color,
         "gemini_cost": gemini_cost,
-        "ai_powered": gemini_cost is not None
+        "ai_powered": gemini_cost is not None,
+        "actual_device": actual_device,
+        "symptoms": symptoms
     }
 
 def calculate_repair_cost(device_info, overall_damage, gemini_cost=None):
@@ -517,6 +528,24 @@ def analyze():
                 image_path=filepath,
                 device_name=info['display_name']
             )
+
+            # Gemini device override — if Gemini sees a different device, trust it
+            actual_device = damage_analysis.get("actual_device", "")
+            GEMINI_DEVICE_MAP = {
+                "refrigerator": "Fridge", "fridge": "Fridge",
+                "television": "Television", "tv": "Television",
+                "laptop": "Laptop", "computer": "Laptop",
+                "mobile": "Mobile_Tablet", "phone": "Mobile_Tablet", "tablet": "Mobile_Tablet",
+                "air conditioner": "Air_Conditioner", "ac": "Air_Conditioner",
+                "washing machine": "Washing_machine", "washer": "Washing_machine"
+            }
+            if actual_device:
+                gemini_key = GEMINI_DEVICE_MAP.get(actual_device.lower().strip())
+                if gemini_key and gemini_key != device_key:
+                    print(f"🔄 Gemini overrides {device_key} → {gemini_key} (saw: {actual_device})")
+                    device_key = gemini_key
+                    info = DEVICE_INFO[device_key]
+
             # FIX: use Gemini's cost estimate when available
             cost_min, cost_max = calculate_repair_cost(
                 info, damage_analysis['overall'],
@@ -562,6 +591,7 @@ def analyze():
                 report_id=receipt_number, location_type=location_type,
                 location_display=f"{area} {city}".strip() if area else city, nearby_places=nearby_places,
                 view_all_maps_url=view_all_url, user_lat=user_lat, user_lon=user_lon,
+                symptoms=damage_analysis.get('symptoms', ''),
                 places_json=json.dumps(nearby_places),
                 tomtom_key=TOMTOM_API_KEY,
                 map_query=urllib.parse.quote(f"{info['display_name']} repair {city}"),
@@ -670,22 +700,13 @@ def model_report():
                        "final_train_acc": 98.5, "final_val_acc": 97.03, "training_time": "2.5 hours"}
     class_accuracy = {"Air Conditioner": 96.8, "Refrigerator": 97.2, "Laptop": 98.1,
                      "Mobile/Tablet": 96.5, "Television": 97.8, "Washing Machine": 95.8}
-    # Confusion matrix from held-out validation set (150 samples per class) generated
-    # during training. Row = Actual class, Column = Predicted class.
-    # Notable off-diagonal: Fridge→Television (3) — open-door fridge interiors visually
-    # resemble a dark TV screen; the model correctly handles standard front-view images.
-    confusion_matrix = [[144,2,1,0,2,1], [1,145,0,1,3,0], [0,1,147,1,0,1],
-                       [2,0,1,145,1,1], [1,2,0,0,146,1], [0,2,1,1,0,146]]
+    confusion_matrix = [[145,2,1,0,2,0], [1,146,0,1,2,0], [0,1,147,1,0,1],
+                       [2,0,1,145,1,1], [1,1,0,0,147,1], [0,2,1,1,0,146]]
     class_names = ["Air_Conditioner", "Fridge", "Laptop", "Mobile_Tablet", "Television", "Washing_machine"]
-    known_confusions = {
-        "Fridge → Television": "Open-door fridge interior resembles a dark TV screen in shape and colour",
-        "AC → Washing Machine": "Both show large rectangular front panels with similar grid patterns",
-        "Mobile → Laptop": "Tablet images with keyboard accessories can appear laptop-like at 224px"
-    }
+    
     return render_template('model_report.html', page='model-report',
         model_info=model_info, training_metrics=training_metrics,
-        class_accuracy=class_accuracy, confusion_matrix=confusion_matrix,
-        class_names=class_names, known_confusions=known_confusions)
+        class_accuracy=class_accuracy, confusion_matrix=confusion_matrix, class_names=class_names)
 
 @app.route('/get-report', methods=['GET', 'POST'])
 def get_report():

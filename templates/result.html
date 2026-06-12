@@ -306,6 +306,25 @@ Save this number to retrieve your report at <a href="/get-report">/get-report</a
 
 <h3 style="text-align:center;margin-top:40px;">Damage Analysis</h3>
 
+{% if ai_powered %}
+<div style="text-align:center;margin-bottom:16px;">
+  <span style="background:linear-gradient(135deg,#4285f4,#0f9d58);color:white;padding:6px 16px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:0.5px;">
+    ✨ Powered by Gemini AI Vision
+  </span>
+</div>
+{% if gemini_reasoning %}
+<p style="text-align:center;color:var(--muted);font-size:13px;font-style:italic;margin-bottom:20px;max-width:500px;margin-left:auto;margin-right:auto;">
+  "{{ gemini_reasoning }}"
+</p>
+{% endif %}
+{% else %}
+<div style="text-align:center;margin-bottom:16px;">
+  <span style="background:#334155;color:#94a3b8;padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600;">
+    📊 Formula-based estimate (add GEMINI_API_KEY for AI analysis)
+  </span>
+</div>
+{% endif %}
+
 <div class="damage-grid">
 <div class="damage-card">
 <h4>Cracks</h4>
@@ -355,6 +374,7 @@ Save this number to retrieve your report at <a href="/get-report">/get-report</a
 </div>
 
 <div class="location-grid">
+{% if nearby_places %}
 {% for place in nearby_places %}
 <div class="location-card">
 <div class="card-header">
@@ -368,6 +388,17 @@ Save this number to retrieve your report at <a href="/get-report">/get-report</a
 <a href="{{ place.maps_url }}" target="_blank" class="btn">View Directions</a>
 </div>
 {% endfor %}
+{% else %}
+<div style="text-align:center;padding:40px 20px;background:var(--card);border-radius:16px;border:1px dashed #334155;width:100%;">
+  <div style="font-size:40px;margin-bottom:12px;">🔍</div>
+  <h4 style="color:var(--text);margin-bottom:8px;">No verified shops found nearby</h4>
+  <p style="color:var(--muted);font-size:14px;margin-bottom:20px;">
+    OpenStreetMap doesn't have mapped repair shops in your exact area yet.<br>
+    Use the button below to search on Google Maps directly.
+  </p>
+  <a href="{{ view_all_maps_url }}" target="_blank" class="btn">Search on Google Maps</a>
+</div>
+{% endif %}
 </div>
 
 <div style="text-align:center;margin-top:20px;">

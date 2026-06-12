@@ -28,7 +28,12 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 import base64
+from db import init_db, save_report, get_report as db_get_report, save_analysis, get_history
 
+# API keys — set these in Render Dashboard → Environment Variables
+# Never hardcode keys here — get free keys at:
+#   TomTom : developer.tomtom.com
+#   Gemini : aistudio.google.com
 TOMTOM_API_KEY = os.environ.get("TOMTOM_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
@@ -69,9 +74,13 @@ LOCATIONS_WITH_COORDS = {
     }
 }
 
-report_storage = {}
-analysis_history = []
+# In-memory dicts replaced by SQLite — data now survives server restarts
+# report_storage = {}     ← now in db.py → reports table
+# analysis_history = []   ← now in db.py → analysis_history table
 model = None
+
+# Initialise the database tables on startup
+init_db()
 
 def generate_receipt_number():
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -515,9 +524,11 @@ def analyze():
             )
             location_type, nearby_places, view_all_url = get_nearby_places(city, user_lat, user_lon, info['display_name'], damage_analysis['repairability'])
             receipt_number = generate_receipt_number()
-            
-            report_storage[receipt_number] = {
-                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            # Save full report to SQLite (persists across server restarts)
+            save_report(receipt_number, now, {
+                'timestamp': now,
                 'device': info['display_name'], 'confidence': round(confidence, 2),
                 'device_age': device_age, 'repairability': damage_analysis['repairability'],
                 'cracks': damage_analysis['cracks'], 'rust': damage_analysis['rust'],
@@ -525,20 +536,19 @@ def analyze():
                 'overall_damage': damage_analysis['overall'], 'cost_min': cost_min, 'cost_max': cost_max,
                 'show_rust': info['show_rust'], 'nearby_places': nearby_places,
                 'location': f"{area} {city}".strip() if area else city, 'status_color': damage_analysis['status_color']
-            }
-            
-            analysis_history.append({
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            })
+
+            # Save analytics entry to SQLite
+            save_analysis({
+                "timestamp": now,
                 "device": info['display_name'], "confidence": round(confidence, 2),
                 "repairability": damage_analysis['repairability'],
                 "repairability_class": damage_analysis['repairability_class'],
                 "damage": damage_analysis['overall'], "age": device_age,
                 "location": city, "cracks": damage_analysis['cracks'],
-                "rust": damage_analysis['rust'], "broken": damage_analysis['broken']
+                "rust": damage_analysis['rust'], "broken": damage_analysis['broken'],
+                "cost_min": cost_min, "cost_max": cost_max
             })
-            
-            if len(analysis_history) > 100:
-                analysis_history.pop(0)
             
             return render_template('result.html',
                 page='result', image_filename=unique_filename,
@@ -566,6 +576,8 @@ def analyze():
 
 @app.route('/analytics')
 def analytics():
+    analysis_history = get_history(100)   # fetch from SQLite
+
     if not analysis_history:
         return render_template('analytics.html', page='analytics', total_analyses=0,
             repairable_percent=0, most_common_device="N/A", avg_confidence=0, avg_damage=0, avg_cost=0,
@@ -598,7 +610,12 @@ def analytics():
     most_common = max(device_counts, key=device_counts.get)
     avg_confidence = round(total_confidence / total, 1)
     avg_damage = round(total_damage / total, 1)
-    avg_cost = 8500
+
+    # Fix: compute real average cost from actual analysis history
+    costs = [(e["cost_min"] + e["cost_max"]) / 2
+             for e in analysis_history if "cost_min" in e and "cost_max" in e]
+    avg_cost = int(sum(costs) / len(costs)) if costs else 0
+
     repairable_percent = round((repairability_counts["Repairable"] / total) * 100, 1)
     
     device_labels = list(device_counts.keys())
@@ -642,7 +659,7 @@ def analytics():
         city_labels=json.dumps(city_labels), city_data=json.dumps(city_data),
         device_repairable=json.dumps(device_repairable), device_mostly=json.dumps(device_mostly),
         device_not=json.dumps(device_not), confidence_trend=json.dumps([94.5,95.2,96.1,96.8,97.0,97.2,avg_confidence]),
-        recent_predictions=analysis_history[-10:][::-1])
+        recent_predictions=analysis_history[:10])
 
 @app.route('/model-report')
 def model_report():
@@ -665,7 +682,7 @@ def model_report():
 def get_report():
     if request.method == 'POST':
         receipt = request.form.get('receipt_number', '').strip().upper()
-        if receipt in report_storage:
+        if db_get_report(receipt):   # check SQLite db
             return redirect(url_for('download_report', report_id=receipt))
         else:
             flash('Receipt number not found', 'error')
@@ -673,10 +690,9 @@ def get_report():
 
 @app.route('/download-report/<report_id>')
 def download_report(report_id):
-    if report_id not in report_storage:
+    report_data = db_get_report(report_id)   # fetch from SQLite
+    if not report_data:
         return "Report not found", 404
-    
-    report_data = report_storage[report_id]
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
     story = []

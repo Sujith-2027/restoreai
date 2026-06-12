@@ -13,12 +13,19 @@
     transition:0.3s;
     background:rgba(22,163,74,0.04);
     position:relative;
+    user-select:none;
+    -webkit-user-select:none;
 }
+.upload-area *{ pointer-events:none; }
 .upload-area:hover{
     border-color:var(--accent);
-    background:rgba(22,163,74,0.1);
-    transform:translateY(-2px);
-    box-shadow:0 8px 30px rgba(22,163,74,0.15);
+    background:rgba(22,163,74,0.12);
+    transform:translateY(-3px);
+    box-shadow:0 12px 40px rgba(22,163,74,0.2);
+}
+.upload-area:active{
+    transform:translateY(-1px);
+    box-shadow:0 4px 16px rgba(22,163,74,0.15);
 }
 .upload-icon{
     font-size:52px;
@@ -128,14 +135,14 @@ input:focus{ outline:none; border-color:var(--accent); }
 
 <form method="POST" action="/analyze" enctype="multipart/form-data" id="mainForm">
 
-<div class="upload-area" onclick="document.getElementById('fileInput').click()">
+<label for="fileInput" class="upload-area">
     <span class="upload-icon">&#128247;</span>
     <h3>Upload Device Image</h3>
     <p>Take a clear photo of your device showing the damage</p>
-    <span class="upload-hint">Click here to select image</span>
-    <p style="margin-top:12px; font-size:12px;">Supports JPG, PNG, JPEG</p>
+    <span class="upload-hint">Click anywhere here to select image</span>
+    <p style="margin-top:12px; font-size:12px; color:var(--muted);">Supports JPG, PNG, JPEG · Max 16MB</p>
     <input type="file" id="fileInput" name="image" accept="image/*" style="display:none" required>
-</div>
+</label>
 <div id="file-info" style="display:none; text-align:center; margin-top:12px; color:var(--accent); font-size:13px; font-weight:600;"></div>
 <img id="preview" alt="Preview" style="display:none; max-width:100%; margin-top:20px; border-radius:12px; border:2px solid #334155;">
 

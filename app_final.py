@@ -29,8 +29,8 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 import base64
 
-TOMTOM_API_KEY  = os.environ.get("TOMTOM_API_KEY",  "gxB9bdSirhbwNexQAyo7CqOplqTxUPeB")
-GEMINI_API_KEY  = os.environ.get("GEMINI_API_KEY",  "")   # set in Render env vars
+TOMTOM_API_KEY = os.environ.get("TOMTOM_API_KEY", "")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 app = Flask(__name__)
 app.secret_key = 'restoreai_secret_2026_fixed'
